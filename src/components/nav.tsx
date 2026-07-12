@@ -2,9 +2,27 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { motion } from "motion/react";
+import { useTheme } from "next-themes";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import {
+  Home,
+  ListOrdered,
+  ArrowLeftRight,
+  SlidersHorizontal,
+  Plus,
+  Pin,
+  PinOff,
+  Moon,
+  Sun,
+  LogOut,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/ui";
 import { APP_NAME } from "@/lib/constants";
-import { Home, ListOrdered, ArrowLeftRight, SlidersHorizontal, Plus, type LucideIcon } from "lucide-react";
+import { SPRING } from "@/lib/motion";
+import { logout } from "@/actions/auth";
 
 interface NavItem {
   href: string;
@@ -24,86 +42,276 @@ function isActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-/** Bottom nav for < 1024px. Add button in the center. */
-export function BottomNav() {
+const PIN_KEY = "cointraq-sidebar-pinned";
+
+/* ------------------------------------------------------------------ */
+/* Desktop: collapsible rail (§2) — Claude-style                       */
+/* ------------------------------------------------------------------ */
+
+export function Sidebar() {
   const pathname = usePathname();
+  // Server and first client render agree on false; the real pinned state (already
+  // painted via the pre-hydration html attribute + CSS) syncs in the effect below.
+  const [pinned, setPinned] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    setPinned(document.documentElement.hasAttribute("data-sidebar-pinned"));
+  }, []);
+
+  const togglePin = useCallback(() => {
+    setPinned((prev) => {
+      const next = !prev;
+      document.documentElement.toggleAttribute("data-sidebar-pinned", next);
+      try {
+        localStorage.setItem(PIN_KEY, next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  // Hover intent: ~120ms before expanding, ~200ms grace before collapsing.
+  const onEnter = () => {
+    if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    enterTimer.current = setTimeout(() => setHovered(true), 120);
+  };
+  const onLeave = () => {
+    if (enterTimer.current) clearTimeout(enterTimer.current);
+    leaveTimer.current = setTimeout(() => setHovered(false), 200);
+  };
+
+  const expanded = hovered || pinned;
+
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 h-[72px] bg-surface border-t border-border grid grid-cols-5 items-center pb-1.5 shadow-[0_-4px_16px_rgba(0,0,0,0.18)] z-40">
-      <NavCell item={items[0]} active={isActive(pathname, items[0].href)} />
-      <NavCell item={items[1]} active={isActive(pathname, items[1].href)} />
-      <div className="flex items-center justify-center">
-        <Link
-          href="/add"
-          aria-label="Add transaction"
-          className="w-[52px] h-[52px] rounded-full bg-primary text-primary-contrast flex items-center justify-center -mt-8 border-4 border-surface"
-        >
-          <Plus size={24} strokeWidth={2} />
-        </Link>
-      </div>
-      <NavCell item={items[2]} active={isActive(pathname, items[2].href)} />
-      <NavCell item={items[3]} active={isActive(pathname, items[3].href)} />
-    </nav>
+    <Tooltip.Provider delayDuration={300}>
+      <aside
+        data-expanded={hovered || undefined}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        className="rail hidden lg:flex fixed top-3 left-3 bottom-3 z-40 flex-col gap-2 overflow-hidden bg-surface rounded-card p-3 shadow-[var(--shadow-card)]"
+      >
+        {/* Logo + pin */}
+        <div className="flex items-center h-10">
+          <div className="w-11 flex-none flex justify-center">
+            <div className="w-7 h-7 rounded-lg bg-primary text-primary-contrast flex items-center justify-center font-semibold text-sm">
+              {APP_NAME.charAt(0).toUpperCase()}
+            </div>
+          </div>
+          <span className="rail-label text-[16px] font-semibold text-text-primary flex-1">{APP_NAME}</span>
+          <button
+            onClick={togglePin}
+            aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+            className="rail-when-expanded icon-btn w-8 h-8 rounded-full items-center justify-center text-text-faint flex-none"
+          >
+            {pinned ? <PinOff size={15} strokeWidth={1.75} /> : <Pin size={15} strokeWidth={1.75} />}
+          </button>
+        </div>
+
+        {/* Add transaction */}
+        <RailTooltip label="Add transaction" enabled={!expanded}>
+          <Link
+            href="/add"
+            aria-label="Add transaction"
+            className="flex items-center h-10 rounded-control bg-primary text-primary-contrast pressable"
+          >
+            <span className="w-11 flex-none flex justify-center">
+              <Plus size={18} strokeWidth={2} />
+            </span>
+            <span className="rail-label text-[13.5px] font-semibold">Add transaction</span>
+          </Link>
+        </RailTooltip>
+
+        {/* Nav */}
+        <nav className="flex flex-col gap-0.5 mt-1">
+          {items.map((it, i) => {
+            const active = isActive(pathname, it.href);
+            const Icon = it.icon;
+            return (
+              <RailTooltip key={it.href} label={it.label} enabled={!expanded}>
+                <Link
+                  href={it.href}
+                  aria-label={it.label}
+                  className={cn(
+                    "relative flex items-center h-10 rounded-control",
+                    active ? "text-primary font-semibold" : "text-text-secondary font-medium hover:text-text-primary",
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="nav-pill"
+                      transition={SPRING}
+                      className="absolute inset-0 rounded-control bg-primary/12"
+                    />
+                  )}
+                  <span className="relative w-11 flex-none flex justify-center">
+                    <Icon size={18} strokeWidth={1.75} />
+                  </span>
+                  <span className="rail-label relative text-[13.5px]" style={{ "--stagger": i } as React.CSSProperties}>
+                    {it.label}
+                  </span>
+                </Link>
+              </RailTooltip>
+            );
+          })}
+        </nav>
+
+        <div className="flex-1" />
+
+        {/* Quiet utilities */}
+        <div className="flex flex-col gap-0.5">
+          <ThemeRailButton enabled={!expanded} />
+          <RailTooltip label="Log out" enabled={!expanded}>
+            <form action={logout}>
+              <button
+                type="submit"
+                aria-label="Log out"
+                className="w-full flex items-center h-10 rounded-control text-text-faint hover:text-text-primary icon-btn"
+              >
+                <span className="w-11 flex-none flex justify-center">
+                  <LogOut size={17} strokeWidth={1.75} />
+                </span>
+                <span className="rail-label text-[13px] font-medium">Log out</span>
+              </button>
+            </form>
+          </RailTooltip>
+        </div>
+      </aside>
+    </Tooltip.Provider>
   );
 }
 
-function NavCell({ item, active }: { item: NavItem; active: boolean }) {
+function ThemeRailButton({ enabled }: { enabled: boolean }) {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const dark = !mounted || resolvedTheme === "dark";
+  return (
+    <RailTooltip label={dark ? "Light theme" : "Dark theme"} enabled={enabled}>
+      <button
+        onClick={() => setTheme(dark ? "light" : "dark")}
+        aria-label={dark ? "Switch to light theme" : "Switch to dark theme"}
+        className="w-full flex items-center h-10 rounded-control text-text-faint hover:text-text-primary icon-btn"
+      >
+        <span className="w-11 flex-none flex justify-center">
+          {dark ? <Sun size={17} strokeWidth={1.75} /> : <Moon size={17} strokeWidth={1.75} />}
+        </span>
+        <span className="rail-label text-[13px] font-medium">{dark ? "Light theme" : "Dark theme"}</span>
+      </button>
+    </RailTooltip>
+  );
+}
+
+/** Radix tooltip to the right of the rail, only when collapsed. */
+function RailTooltip({
+  label,
+  enabled,
+  children,
+}: {
+  label: string;
+  enabled: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      {enabled && (
+        <Tooltip.Portal>
+          <Tooltip.Content
+            side="right"
+            sideOffset={10}
+            className="z-50 px-2.5 py-1.5 rounded-[10px] bg-surface-overlay text-text-primary text-[12px] font-medium shadow-[var(--shadow-overlay)] select-none"
+          >
+            {label}
+          </Tooltip.Content>
+        </Tooltip.Portal>
+      )}
+    </Tooltip.Root>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Mobile: floating dock (§3)                                          */
+/* ------------------------------------------------------------------ */
+
+export function Dock() {
+  const pathname = usePathname();
+  const [hidden, setHidden] = useState(false);
+
+  // Hide on scroll down, reveal on any upward scroll. Paused while a drawer is open.
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      if (document.body.hasAttribute("data-drawer-open")) return;
+      const y = window.scrollY;
+      const dy = y - lastY;
+      if (dy > 6 && y > 80) setHidden(true);
+      else if (dy < -2) setHidden(false);
+      lastY = y;
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const left = items.slice(0, 2);
+  const right = items.slice(2);
+
+  return (
+    <div
+      className="lg:hidden fixed inset-x-0 bottom-0 z-40 flex justify-center pointer-events-none"
+      style={{ paddingBottom: "calc(16px + env(safe-area-inset-bottom))" }}
+    >
+      <motion.nav
+        animate={{ y: hidden ? "140%" : "0%" }}
+        transition={SPRING}
+        aria-label="Primary"
+        className="pointer-events-auto flex items-center gap-1 h-16 px-2 rounded-full backdrop-blur-xl shadow-[var(--shadow-overlay)]"
+        style={{ background: "var(--surface-glass)" }}
+      >
+        {left.map((it) => (
+          <DockItem key={it.href} item={it} active={isActive(pathname, it.href)} />
+        ))}
+        <Link
+          href="/add"
+          aria-label="Add transaction"
+          className="w-14 h-14 mx-1 rounded-full bg-primary text-primary-contrast flex items-center justify-center shadow-[var(--shadow-hero)] pressable"
+        >
+          <Plus size={24} strokeWidth={2.25} />
+        </Link>
+        {right.map((it) => (
+          <DockItem key={it.href} item={it} active={isActive(pathname, it.href)} />
+        ))}
+      </motion.nav>
+    </div>
+  );
+}
+
+function DockItem({ item, active }: { item: NavItem; active: boolean }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
-      className={cn("flex flex-col items-center gap-1", active ? "text-primary" : "text-text-faint")}
+      aria-label={item.label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative w-12 h-12 rounded-full flex items-center justify-center",
+        active ? "text-primary" : "text-text-faint",
+      )}
     >
-      <Icon size={22} strokeWidth={1.75} />
-      <span className="text-[10px] font-medium">{item.label}</span>
-    </Link>
-  );
-}
-
-/**
- * Floating fixed sidebar for >= 1024px (Claude-desktop style): pinned to the
- * viewport, insets from the edges so it reads as a floating panel, and stays put
- * while the page content scrolls.
- */
-export function Sidebar() {
-  const pathname = usePathname();
-  return (
-    <aside className="hidden lg:flex fixed top-3 left-3 bottom-3 w-[224px] z-30 flex-col gap-5 bg-surface border border-transparent rounded-card p-4 shadow-[var(--shadow-card)]">
-      <div className="flex items-center gap-2.5 px-1.5 py-0.5">
-        <div className="w-7 h-7 rounded-lg bg-primary text-primary-contrast flex items-center justify-center font-semibold text-sm">
-          {APP_NAME.charAt(0).toUpperCase()}
-        </div>
-        <div className="text-[17px] font-semibold text-text-primary">{APP_NAME}</div>
-      </div>
-
-      <Link
-        href="/add"
-        className="flex items-center justify-center gap-2 h-10 rounded-control bg-primary text-primary-contrast font-semibold text-[13.5px]"
+      {active && (
+        <motion.span layoutId="dock-pill" transition={SPRING} className="absolute inset-0.5 rounded-full bg-primary/15" />
+      )}
+      <motion.span
+        key={active ? "on" : "off"}
+        initial={{ scale: active ? 0.9 : 1 }}
+        animate={{ scale: 1 }}
+        transition={SPRING}
+        className="relative"
       >
-        <Plus size={16} strokeWidth={2} />
-        Add transaction
-      </Link>
-
-      <div className="flex flex-col gap-0.5">
-        {items.map((it) => {
-          const active = isActive(pathname, it.href);
-          const Icon = it.icon;
-          return (
-            <Link
-              key={it.href}
-              href={it.href}
-              className={cn(
-                "flex items-center gap-3 h-10 px-3 rounded-control transition-colors",
-                active
-                  ? "bg-primary/12 text-primary font-semibold"
-                  : "text-text-secondary font-medium hover:bg-surface-raised",
-              )}
-            >
-              <Icon size={18} strokeWidth={1.75} />
-              <span className="text-[13.5px]">{it.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </aside>
+        {/* lucide has no filled variants — active reads as bolder stroke + tint pill */}
+        <Icon size={22} strokeWidth={active ? 2.4 : 1.75} />
+      </motion.span>
+    </Link>
   );
 }

@@ -154,6 +154,44 @@ html[data-sidebar-pinned] {
   --sidebar-offset: 280px; /* 12 + 256 + 12 */
 }
 
+/*
+  Sidebar rail (§2). Width/labels are CSS-driven so the pinned state (html attr,
+  set pre-paint) renders correctly on first paint with zero hydration drift.
+  Hover-expand toggles data-expanded from React after mount.
+*/
+.rail {
+  width: 68px;
+  transition: width 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.rail[data-expanded],
+html[data-sidebar-pinned] .rail {
+  width: 256px;
+}
+.rail-label {
+  opacity: 0;
+  transform: translateX(-8px);
+  pointer-events: none;
+  white-space: nowrap;
+  transition:
+    opacity 250ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 250ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: calc(var(--stagger, 0) * 20ms);
+}
+.rail[data-expanded] .rail-label,
+html[data-sidebar-pinned] .rail .rail-label {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+/* Pin affordance & tooltips flip with expansion. */
+.rail-when-expanded {
+  display: none;
+}
+.rail[data-expanded] .rail-when-expanded,
+html[data-sidebar-pinned] .rail .rail-when-expanded {
+  display: inline-flex;
+}
+
 /* Hover language (§6) — desktop pointers only; touch never gets sticky hovers. */
 @media (hover: hover) {
   .hover-lift {
