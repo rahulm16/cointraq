@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/ui";
 import { APP_NAME } from "@/lib/constants";
+import { CointraqLogo } from "@/components/cointraq-logo";
 import { SPRING } from "@/lib/motion";
 import { logout } from "@/actions/auth";
 
@@ -82,8 +83,8 @@ export function Sidebar() {
         {/* Logo + pin */}
         <div className="flex items-center h-10">
           <div className="w-11 flex-none flex justify-center">
-            <div className="w-7 h-7 rounded-lg bg-primary text-primary-contrast flex items-center justify-center font-semibold text-sm">
-              {APP_NAME.charAt(0).toUpperCase()}
+            <div className="w-7 h-7 rounded-lg bg-primary/12 text-primary flex items-center justify-center">
+              <CointraqLogo size={22} />
             </div>
           </div>
           <span className="rail-label text-[16px] font-semibold text-text-primary flex-1">{APP_NAME}</span>
