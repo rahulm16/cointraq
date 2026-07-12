@@ -1,5 +1,6 @@
 import { getFilteredTransactions, getAccounts, getMethods, getCategories } from "@/db/queries";
 import { MonthSwitcher } from "@/components/month-switcher";
+import { MonthTransition } from "@/components/month-transition";
 import { TransactionsView } from "./transactions-view";
 import { APP_NAME } from "@/lib/constants";
 import { todayIST, monthKey, monthRange } from "@/lib/dates";
@@ -59,15 +60,17 @@ export default async function TransactionsPage({
       <div className="mb-4">
         <MonthSwitcher month={month} maxMonth={nowMonth} />
       </div>
-      <TransactionsView
-        transactions={txns}
-        accounts={accounts}
-        methods={methods}
-        categories={categories}
-        summary={summary}
-        today={todayIST()}
-        filters={{ type, methodId, categoryId, accountId, search }}
-      />
+      <MonthTransition month={month}>
+        <TransactionsView
+          transactions={txns}
+          accounts={accounts}
+          methods={methods}
+          categories={categories}
+          summary={summary}
+          today={todayIST()}
+          filters={{ type, methodId, categoryId, accountId, search }}
+        />
+      </MonthTransition>
     </main>
   );
 }

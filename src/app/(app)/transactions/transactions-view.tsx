@@ -4,10 +4,10 @@ import { useState, useMemo } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
 import { Card, EmptyState } from "@/components/ui";
-import { Sheet } from "@/components/sheet";
+import { AppDrawer } from "@/components/drawer";
 import { TxnRow } from "@/components/txn-row";
 import { EditForm } from "./edit-form";
-import { formatINR } from "@/lib/money";
+import { INRFlow } from "@/components/inr-flow";
 import { formatDayLabel } from "@/lib/dates";
 import { TYPE_LABEL } from "@/lib/txn-display";
 import type { TransactionType } from "@/lib/types";
@@ -119,7 +119,10 @@ export function TransactionsView({
           {summary.count} transaction{summary.count === 1 ? "" : "s"}
         </span>
         <span className="text-[12.5px] text-text-secondary">
-          Spends <span className="tnum font-medium text-text-primary">{formatINR(summary.total)}</span>
+          Spends{" "}
+          <span className="font-medium text-text-primary">
+            <INRFlow value={summary.total} />
+          </span>
         </span>
       </div>
 
@@ -152,7 +155,7 @@ export function TransactionsView({
         </div>
       )}
 
-      <Sheet open={!!editing} onClose={() => setEditing(null)} title="Edit transaction">
+      <AppDrawer open={!!editing} onClose={() => setEditing(null)} title="Edit transaction">
         {editing && (
           <EditForm
             txn={editing}
@@ -163,7 +166,7 @@ export function TransactionsView({
             onDone={() => setEditing(null)}
           />
         )}
-      </Sheet>
+      </AppDrawer>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { getAccounts, getMethods, getCategories, getTxnEffects } from "@/db/queries";
 import { AddTransaction } from "./add-transaction";
+import { AddDrawerShell } from "./add-drawer-shell";
 import { APP_NAME } from "@/lib/constants";
 import { todayIST } from "@/lib/dates";
 import { cardStatement } from "@/lib/statement";
@@ -30,15 +31,16 @@ export default async function AddPage() {
   });
 
   return (
-    <main className="max-w-[560px] mx-auto p-4 lg:p-8">
-      <h1 className="text-xl font-semibold text-text-primary mb-4">Add transaction</h1>
-      <AddTransaction
-        accounts={accounts}
-        methods={methods}
-        categories={categories}
-        today={today}
-        lastStatements={lastStatements}
-      />
+    <main className="min-h-dvh">
+      <AddDrawerShell>
+        <AddTransaction
+          accounts={accounts}
+          methods={methods}
+          categories={categories}
+          today={today}
+          lastStatements={lastStatements}
+        />
+      </AddDrawerShell>
     </main>
   );
 }

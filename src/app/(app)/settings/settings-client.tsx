@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import { Avatar, Card, StatusBadge } from "@/components/ui";
-import { Sheet } from "@/components/sheet";
+import { AppDrawer } from "@/components/drawer";
 import { useToast } from "@/components/toast";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { GhostButton } from "@/components/form";
@@ -170,7 +170,7 @@ export function SettingsClient({
       </Card>
 
       {/* Editors */}
-      <Sheet
+      <AppDrawer
         open={editor?.kind === "account"}
         onClose={() => setEditor(null)}
         title={editor?.kind === "account" && editor.value ? "Edit account" : "New account"}
@@ -178,9 +178,9 @@ export function SettingsClient({
         {editor?.kind === "account" && (
           <AccountForm account={editor.value} onDone={() => setEditor(null)} />
         )}
-      </Sheet>
+      </AppDrawer>
 
-      <Sheet
+      <AppDrawer
         open={editor?.kind === "method"}
         onClose={() => setEditor(null)}
         title={editor?.kind === "method" && editor.value ? "Edit method" : "New method"}
@@ -188,9 +188,9 @@ export function SettingsClient({
         {editor?.kind === "method" && (
           <MethodForm method={editor.value} accounts={accounts.filter((a) => !a.isArchived)} onDone={() => setEditor(null)} />
         )}
-      </Sheet>
+      </AppDrawer>
 
-      <Sheet
+      <AppDrawer
         open={editor?.kind === "category"}
         onClose={() => setEditor(null)}
         title={editor?.kind === "category" && editor.value ? "Edit category" : "New category"}
@@ -198,7 +198,7 @@ export function SettingsClient({
         {editor?.kind === "category" && (
           <CategoryForm category={editor.value} onDone={() => setEditor(null)} />
         )}
-      </Sheet>
+      </AppDrawer>
 
       <div className="lg:hidden h-2" aria-hidden />
       <p className="text-center text-[11px] text-text-faint">{CATEGORY_COLORS.length} palette colors available for categories.</p>

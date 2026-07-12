@@ -9,6 +9,7 @@ import { ConfirmDialog } from "@/components/sheet";
 import { SubmitButton } from "@/components/form";
 import { useToast } from "@/components/toast";
 import { formatINR } from "@/lib/money";
+import { INRFlow } from "@/components/inr-flow";
 import { formatDayLabel } from "@/lib/dates";
 import { Check, Trash2 } from "lucide-react";
 
@@ -112,7 +113,9 @@ export function ReconcileClient({
                 <div className="flex items-center gap-4 mt-3">
                   <div className="flex-1 flex flex-col gap-1">
                     <Eyebrow>Expected</Eyebrow>
-                    <span className="tnum text-[16px] text-text-secondary">{formatINR(r.expected)}</span>
+                    <span className="text-[16px] text-text-secondary">
+                      <INRFlow value={r.expected} />
+                    </span>
                   </div>
                   <div className="flex-1 flex flex-col gap-1">
                     <Eyebrow>Actual</Eyebrow>
@@ -141,7 +144,7 @@ export function ReconcileClient({
                     ) : (
                       <div className="flex flex-col gap-0.5">
                         <div className="text-[12.5px] font-semibold text-warning">
-                          <span className="tnum">{formatINR(Math.abs(delta))}</span> unaccounted
+                          <INRFlow value={Math.abs(delta)} /> unaccounted
                         </div>
                         <div className="text-[11.5px] text-warning/75">
                           {delta < 0 ? "spends you may not have logged" : "unlogged income or credits"}

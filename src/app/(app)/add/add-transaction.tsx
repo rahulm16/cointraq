@@ -4,11 +4,12 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import { createTransaction } from "@/actions/transactions";
 import type { ActionResult } from "@/actions/shared";
-import { Card } from "@/components/ui";
 import { Field, SubmitButton } from "@/components/form";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/ui";
 import { formatINR } from "@/lib/money";
+import { motion } from "motion/react";
+import { SPRING } from "@/lib/motion";
 import {
   AmountInput,
   MethodChips,
@@ -93,23 +94,26 @@ export function AddTransaction({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-inner bg-surface-raised border border-transparent overflow-x-auto">
+      {/* Segmented type control with sliding indicator (§8) */}
+      <div className="flex gap-1 p-1 rounded-full bg-surface-raised overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={cn(
-              "flex-1 min-w-max h-9 px-3 rounded-control text-[13px] font-medium whitespace-nowrap",
-              tab === t.id ? "bg-primary text-primary-contrast" : "text-text-secondary",
+              "relative flex-1 min-w-max h-9 px-3 rounded-full text-[13px] font-medium whitespace-nowrap pressable",
+              tab === t.id ? "text-primary-contrast" : "text-text-secondary",
             )}
           >
-            {t.label}
+            {tab === t.id && (
+              <motion.span layoutId="add-tab-pill" transition={SPRING} className="absolute inset-0 rounded-full bg-primary" />
+            )}
+            <span className="relative">{t.label}</span>
           </button>
         ))}
       </div>
 
-      <Card>
+      <div>
         {/* key forces a fresh form (and fresh field state) when switching tabs */}
         <form key={tab} ref={formRef} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="kind" value={tab} />
@@ -206,7 +210,7 @@ export function AddTransaction({
             <SubmitButton pending={pending}>Save</SubmitButton>
           </div>
         </form>
-      </Card>
+      </div>
     </div>
   );
 }

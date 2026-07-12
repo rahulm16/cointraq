@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
 import { Card } from "@/components/ui";
-import { Sheet } from "@/components/sheet";
+import { AppDrawer } from "@/components/drawer";
 import { TxnRow } from "@/components/txn-row";
 import { EditForm } from "./transactions/edit-form";
 
@@ -47,7 +47,7 @@ export function RecentList({
         </div>
       </Card>
 
-      <Sheet open={!!editing} onClose={() => setEditing(null)} title="Edit transaction">
+      <AppDrawer open={!!editing} onClose={() => setEditing(null)} title="Edit transaction">
         {editing && (
           <EditForm
             txn={editing}
@@ -58,7 +58,7 @@ export function RecentList({
             onDone={() => setEditing(null)}
           />
         )}
-      </Sheet>
+      </AppDrawer>
     </div>
   );
 }
