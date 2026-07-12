@@ -267,7 +267,7 @@ function PeriodPickerCard({
 
         <section>
           <Eyebrow className="mb-2.5">Quick pick</Eyebrow>
-          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5">
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 scrollbar-none">
             {PRESET_LABELS.map(({ id, label }) => {
               const r = presets[id];
               const active = r.from === draft.from && r.to === draft.to;
@@ -316,7 +316,7 @@ function PeriodPickerCard({
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid grid-cols-6 gap-1">
             {months.map((mk) => {
               const disabled = mk > maxMonth;
               const active =
@@ -330,7 +330,7 @@ function PeriodPickerCard({
                   disabled={disabled}
                   onClick={() => applyMonth(mk)}
                   className={cn(
-                    "h-10 rounded-control text-[13px] font-semibold pressable",
+                    "h-8 rounded-inner px-1 text-[11.5px] font-semibold pressable",
                     active
                       ? "bg-primary text-primary-contrast shadow-[var(--shadow-hero)]"
                       : "bg-surface-raised text-text-secondary",

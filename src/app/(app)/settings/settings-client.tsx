@@ -12,6 +12,7 @@ import { cn } from "@/lib/ui";
 import { CATEGORY_COLORS } from "@/lib/constants";
 import { categoryClasses } from "@/lib/ui";
 import { Archive, ArchiveRestore, Pencil, Plus } from "lucide-react";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { logout } from "@/actions/auth";
 import { setAccountArchived } from "@/actions/accounts";
 import { setMethodArchived, setDefaultMethod } from "@/actions/methods";
@@ -54,6 +55,7 @@ export function SettingsClient({
   const visibleCategories = categories.filter((c) => showArchived || !c.isArchived);
 
   return (
+    <Tooltip.Provider delayDuration={200}>
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-end">
         <label className="flex items-center gap-2 text-[13px] text-text-secondary cursor-pointer">
@@ -204,6 +206,7 @@ export function SettingsClient({
       <div className="lg:hidden h-2" aria-hidden />
       <p className="text-center text-[11px] text-text-faint">{CATEGORY_COLORS.length} palette colors available for categories.</p>
     </div>
+    </Tooltip.Provider>
   );
 }
 
@@ -254,6 +257,8 @@ function Row({
   onEdit: () => void;
   onArchiveToggle: () => void;
 }) {
+  const archiveLabel = archived ? "Restore" : "Archive";
+
   return (
     <SwipeRow
       className="border-b border-border last:border-b-0"
@@ -264,7 +269,7 @@ function Row({
         icon: <Pencil size={16} strokeWidth={1.75} />,
       }}
       rightAction={{
-        label: archived ? "Restore" : "Archive",
+        label: archiveLabel,
         onClick: onArchiveToggle,
         className: archived ? "bg-income" : "bg-alert",
         icon: archived ? (
@@ -274,7 +279,12 @@ function Row({
         ),
       }}
     >
-      <div className={cn("flex items-center gap-3 px-4 py-3", archived && "opacity-60")}>
+      <div
+        className={cn(
+          "group relative flex items-center gap-3 px-4 py-3 transition-colors can-hover:hover:bg-surface-raised/50",
+          archived && "opacity-60",
+        )}
+      >
         {icon}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -284,24 +294,67 @@ function Row({
           </div>
           <div className="text-[12px] text-text-secondary truncate">{subtitle}</div>
         </div>
-        {/* Desktop only — mobile uses swipe actions. */}
-        <div className="hidden can-hover:flex items-center gap-3">
-          {extraActions}
-          <button type="button" className="text-[12.5px] font-medium text-text-secondary" onClick={onEdit}>
-            Edit
-          </button>
-          <button
-            type="button"
-            className="text-[12.5px] font-medium text-text-secondary"
-            onClick={onArchiveToggle}
+
+        {extraActions && (
+          <div
+            className={cn(
+              "flex items-center flex-none transition-transform",
+              "can-hover:group-hover:-translate-x-16",
+            )}
           >
-            {archived ? "Restore" : "Archive"}
-          </button>
+            {extraActions}
+          </div>
+        )}
+
+        <div className="hidden can-hover:flex absolute right-1 items-center gap-1 opacity-0 translate-x-2 pointer-events-none transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto">
+          <IconTooltip label="Edit">
+            <button
+              type="button"
+              onClick={onEdit}
+              aria-label="Edit"
+              className="icon-btn w-8 h-8 rounded-full flex items-center justify-center text-text-secondary"
+            >
+              <Pencil size={15} strokeWidth={1.75} />
+            </button>
+          </IconTooltip>
+          <IconTooltip label={archiveLabel}>
+            <button
+              type="button"
+              onClick={onArchiveToggle}
+              aria-label={archiveLabel}
+              className={cn(
+                "icon-btn w-8 h-8 rounded-full flex items-center justify-center text-text-secondary",
+                !archived && "hover:!text-alert",
+              )}
+            >
+              {archived ? (
+                <ArchiveRestore size={15} strokeWidth={1.75} />
+              ) : (
+                <Archive size={15} strokeWidth={1.75} />
+              )}
+            </button>
+          </IconTooltip>
         </div>
-        {/* Keep "Make default" reachable on touch when present. */}
-        {extraActions && <div className="can-hover:hidden flex items-center">{extraActions}</div>}
       </div>
     </SwipeRow>
+  );
+}
+
+function IconTooltip({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          sideOffset={6}
+          className="z-50 px-2.5 py-1.5 rounded-[10px] bg-surface-overlay text-text-primary text-[12px] font-medium shadow-[var(--shadow-overlay)] select-none"
+        >
+          {label}
+          <Tooltip.Arrow className="fill-surface-overlay" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 

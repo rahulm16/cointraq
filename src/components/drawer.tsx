@@ -50,7 +50,7 @@ export function AppDrawer({
           className={cn(
             "z-50 flex flex-col bg-surface-overlay shadow-[var(--shadow-overlay)] outline-none",
             desktop
-              ? "fixed right-2 top-2 bottom-2 w-[440px] max-w-[94vw] rounded-[20px]"
+              ? "fixed inset-y-0 right-0 w-[440px] max-w-[94vw] rounded-l-[20px]"
               : "fixed inset-x-0 bottom-0 max-h-[92dvh] rounded-t-[24px]",
           )}
         >
