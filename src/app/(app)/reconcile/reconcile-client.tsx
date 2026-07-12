@@ -1,7 +1,6 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { saveSnapshots, deleteSnapshotGroup } from "@/actions/reconcile";
 import type { ActionResult } from "@/actions/shared";
 import { Card, Avatar, StatusBadge, Eyebrow } from "@/components/ui";
@@ -28,7 +27,6 @@ const initial: ActionResult = { ok: false };
 
 export function ReconcileClient({
   asOf,
-  today,
   rows,
   history,
 }: {
@@ -37,8 +35,6 @@ export function ReconcileClient({
   rows: Row[];
   history: { date: string; count: number; unaccounted: number }[];
 }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const [state, formAction, pending] = useActionState(saveSnapshots, initial);
   const [actuals, setActuals] = useState<Record<number, string>>({});
   const [toDelete, setToDelete] = useState<string | null>(null);
@@ -78,17 +74,6 @@ export function ReconcileClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
-          <label className="text-[12.5px] text-text-secondary">As of</label>
-          <input
-            type="date"
-            value={asOf}
-            max={today}
-            onChange={(e) => router.push(`${pathname}?d=${e.target.value}`)}
-            className="h-9 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[14px] tnum text-text-primary focus:border-primary"
-          />
-        </div>
-
         <div className="flex items-center justify-between px-4 py-3 rounded-inner bg-surface-raised border border-transparent">
           <span className="text-[12.5px] tnum text-text-secondary">
             {summary.entered} of {rows.length} entered
@@ -122,7 +107,7 @@ export function ReconcileClient({
                   </div>
                   <div className="flex-1 flex flex-col gap-1">
                     <Eyebrow>Actual</Eyebrow>
-                    <div className="h-[42px] flex items-center gap-1.5 px-3 rounded-control bg-surface-raised border border-transparent focus-within:border-primary">
+                    <div className="h-[42px] flex items-center gap-1.5 px-3 rounded-control bg-surface-raised border border-transparent">
                       <span className="tnum text-[15px] text-text-faint">₹</span>
                       <input
                         name={`actual_${r.id}`}

@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
+import type { TitlesByKind } from "@/lib/txn-display";
 import { createTransaction } from "@/actions/transactions";
 import type { ActionResult } from "@/actions/shared";
 import { Field } from "@/components/form";
@@ -18,7 +19,9 @@ import {
   DateField,
   CategoryPicker,
   AccountSelect,
+  TitleInput,
 } from "./txn-fields";
+import { SelectMenu } from "@/components/select-menu";
 
 type Tab = "spend" | "bill_pay" | "transfer" | "withdrawal" | "income";
 const TABS: { id: Tab; label: string }[] = [
@@ -29,6 +32,14 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "income", label: "Income" },
 ];
 
+const TITLE_PLACEHOLDER: Record<Tab, string> = {
+  spend: "dinner with Adi",
+  bill_pay: "credit card bill",
+  transfer: "Transfer",
+  withdrawal: "Withdrawal",
+  income: "Monthly salary",
+};
+
 const initial: ActionResult = { ok: false };
 
 export function AddTransaction({
@@ -37,12 +48,14 @@ export function AddTransaction({
   categories,
   today,
   lastStatements,
+  titlesByKind,
 }: {
   accounts: Account[];
   methods: PaymentMethod[];
   categories: Category[];
   today: string;
   lastStatements: { cardId: number; remaining: number; lastStatement: number }[];
+  titlesByKind: TitlesByKind;
 }) {
   const [tab, setTab] = useState<Tab>("spend");
   const [state, formAction, pending] = useActionState(createTransaction, initial);
@@ -76,24 +89,24 @@ export function AddTransaction({
         action: {
           label: "Add another",
           onClick: () => {
-            // Reset amount & note but keep method/date by only clearing those inputs.
+            // Reset amount & title but keep method/date by only clearing those inputs.
             const f = formRef.current;
             if (!f) return;
-            (f.elements.namedItem("amount") as HTMLInputElement | null)?.setAttribute("value", "");
             const amt = f.querySelector<HTMLInputElement>('input[name="amount"]');
-            const note = f.querySelector<HTMLInputElement>('input[name="note"]');
+            const title = f.querySelector<HTMLInputElement>('input[name="title"]');
             if (amt) amt.value = "";
-            if (note) note.value = "";
+            if (title) title.value = "";
             amt?.focus();
           },
         },
       });
-      // Clear amount/note immediately after a successful save too.
+      // Clear amount/title immediately after a successful save too.
       const f = formRef.current;
       const amt = f?.querySelector<HTMLInputElement>('input[name="amount"]');
-      const note = f?.querySelector<HTMLInputElement>('input[name="note"]');
+      const title = f?.querySelector<HTMLInputElement>('input[name="title"]');
       if (amt) amt.value = "";
-      if (note) note.value = "";
+      if (title) title.value = "";
+      amt?.focus();
       return () => clearTimeout(t);
     }
   }, [state, show]);
@@ -124,9 +137,16 @@ export function AddTransaction({
         <form key={tab} ref={formRef} action={formAction} className="flex flex-col gap-4">
           <input type="hidden" name="kind" value={tab} />
 
-          <AmountInput />
+          <AmountInput autoFocus />
           {state.errors?.amount && <p className="text-[12px] text-alert -mt-2">{state.errors.amount}</p>}
           {state.errors?._ && <p className="text-[12px] text-alert">{state.errors._}</p>}
+
+          <Field label="Title" error={state.errors?.title}>
+            <TitleInput
+              suggestions={titlesByKind[tab]}
+              placeholder={TITLE_PLACEHOLDER[tab]}
+            />
+          </Field>
 
           {tab === "spend" && (
             <>
@@ -189,27 +209,22 @@ export function AddTransaction({
                 <AccountSelect name="toAccountId" accounts={nonCredit} defaultId={nonCredit[0]?.id ?? null} />
               </Field>
               <Field label="Source" error={state.errors?.incomeSource}>
-                <select name="incomeSource" defaultValue="salary" className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full">
-                  <option value="salary">Salary</option>
-                  <option value="refund">Refund</option>
-                  <option value="cashback">Cashback</option>
-                  <option value="other">Other</option>
-                </select>
+                <SelectMenu
+                  name="incomeSource"
+                  defaultValue="salary"
+                  options={[
+                    { value: "salary", label: "Salary" },
+                    { value: "refund", label: "Refund" },
+                    { value: "cashback", label: "Cashback" },
+                    { value: "other", label: "Other" },
+                  ]}
+                />
               </Field>
             </>
           )}
 
           <Field label="Date" error={state.errors?.date}>
             <DateField today={today} />
-          </Field>
-
-          <Field label="Note (optional)" error={state.errors?.note}>
-            <input
-              name="note"
-              maxLength={200}
-              placeholder={tab === "bill_pay" ? "credit card bill" : "dinner with Adi"}
-              className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary"
-            />
           </Field>
 
           <div className="flex justify-end pt-1">

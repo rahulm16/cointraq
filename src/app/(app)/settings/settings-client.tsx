@@ -4,13 +4,14 @@ import { useState, useTransition } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import { Avatar, Card, StatusBadge } from "@/components/ui";
 import { AppDrawer } from "@/components/drawer";
+import { SwipeRow } from "@/components/swipe-row";
 import { useToast } from "@/components/toast";
 import { ThemeSwitcher } from "@/components/theme-switcher";
 import { GhostButton } from "@/components/form";
 import { cn } from "@/lib/ui";
 import { CATEGORY_COLORS } from "@/lib/constants";
 import { categoryClasses } from "@/lib/ui";
-import { Plus } from "lucide-react";
+import { Archive, ArchiveRestore, Pencil, Plus } from "lucide-react";
 import { logout } from "@/actions/auth";
 import { setAccountArchived } from "@/actions/accounts";
 import { setMethodArchived, setDefaultMethod } from "@/actions/methods";
@@ -66,7 +67,7 @@ export function SettingsClient({
         title="Payment methods"
         onAdd={() => setEditor({ kind: "method", value: null })}
       >
-        <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-col">
           {visibleMethods.map((m) => (
             <Row
               key={m.id}
@@ -95,7 +96,7 @@ export function SettingsClient({
 
       {/* Accounts */}
       <Section title="Accounts" onAdd={() => setEditor({ kind: "account", value: null })}>
-        <div className="flex flex-col divide-y divide-border">
+        <div className="flex flex-col">
           {visibleAccounts.map((a) => (
             <Row
               key={a.id}
@@ -118,7 +119,7 @@ export function SettingsClient({
       </Section>
 
       {/* Categories */}
-      <Section title="Categories" onAdd={() => setEditor({ kind: "category", value: null })}>
+      <Section title="Categories" onAdd={() => setEditor({ kind: "category", value: null })} padded>
         <div className="flex flex-wrap gap-2">
           {visibleCategories.map((c) => {
             const cc = categoryClasses(c.color);
@@ -206,7 +207,18 @@ export function SettingsClient({
   );
 }
 
-function Section({ title, onAdd, children }: { title: string; onAdd: () => void; children: React.ReactNode }) {
+function Section({
+  title,
+  onAdd,
+  children,
+  padded = false,
+}: {
+  title: string;
+  onAdd: () => void;
+  children: React.ReactNode;
+  /** Use for non-list content (e.g. category pills). List rows stay full-bleed for swipe. */
+  padded?: boolean;
+}) {
   return (
     <section className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
@@ -217,7 +229,7 @@ function Section({ title, onAdd, children }: { title: string; onAdd: () => void;
         </button>
       </div>
       <Card className="!p-0 overflow-hidden">
-        <div className="p-4">{children}</div>
+        <div className={padded ? "p-4" : undefined}>{children}</div>
       </Card>
     </section>
   );
@@ -243,29 +255,56 @@ function Row({
   onArchiveToggle: () => void;
 }) {
   return (
-    <div className={cn("flex items-center gap-3 py-3 first:pt-0 last:pb-0", archived && "opacity-60")}>
-      {icon}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span className="text-[14px] font-semibold text-text-primary truncate">{title}</span>
-          {badges}
-          {archived && <StatusBadge tone="faint">Archived</StatusBadge>}
+    <SwipeRow
+      className="border-b border-border last:border-b-0"
+      leftAction={{
+        label: "Edit",
+        onClick: onEdit,
+        className: "bg-primary",
+        icon: <Pencil size={16} strokeWidth={1.75} />,
+      }}
+      rightAction={{
+        label: archived ? "Restore" : "Archive",
+        onClick: onArchiveToggle,
+        className: archived ? "bg-income" : "bg-alert",
+        icon: archived ? (
+          <ArchiveRestore size={16} strokeWidth={1.75} />
+        ) : (
+          <Archive size={16} strokeWidth={1.75} />
+        ),
+      }}
+    >
+      <div className={cn("flex items-center gap-3 px-4 py-3", archived && "opacity-60")}>
+        {icon}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[14px] font-semibold text-text-primary truncate">{title}</span>
+            {badges}
+            {archived && <StatusBadge tone="faint">Archived</StatusBadge>}
+          </div>
+          <div className="text-[12px] text-text-secondary truncate">{subtitle}</div>
         </div>
-        <div className="text-[12px] text-text-secondary truncate">{subtitle}</div>
+        {/* Desktop only — mobile uses swipe actions. */}
+        <div className="hidden can-hover:flex items-center gap-3">
+          {extraActions}
+          <button type="button" className="text-[12.5px] font-medium text-text-secondary" onClick={onEdit}>
+            Edit
+          </button>
+          <button
+            type="button"
+            className="text-[12.5px] font-medium text-text-secondary"
+            onClick={onArchiveToggle}
+          >
+            {archived ? "Restore" : "Archive"}
+          </button>
+        </div>
+        {/* Keep "Make default" reachable on touch when present. */}
+        {extraActions && <div className="can-hover:hidden flex items-center">{extraActions}</div>}
       </div>
-      <div className="flex items-center gap-3">
-        {extraActions}
-        <button className="text-[12.5px] font-medium text-text-secondary" onClick={onEdit}>
-          Edit
-        </button>
-        <button className="text-[12.5px] font-medium text-text-secondary" onClick={onArchiveToggle}>
-          {archived ? "Restore" : "Archive"}
-        </button>
-      </div>
-    </div>
+    </SwipeRow>
   );
 }
 
 function Empty() {
-  return <div className="text-[13px] text-text-faint py-2">Nothing here yet.</div>;
+  return <div className="text-[13px] text-text-faint px-4 py-3">Nothing here yet.</div>;
 }

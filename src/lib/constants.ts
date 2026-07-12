@@ -7,8 +7,8 @@ export const APP_TAGLINE = "Your ledger.";
 export const AMOUNT_MIN = 1;
 export const AMOUNT_MAX = 10_00_00_000; // 10 crore
 
-// Note length cap. SPEC §4.
-export const NOTE_MAX = 200;
+// Title length cap.
+export const TITLE_MAX = 200;
 
 // Icon upload cap (base64 data URL length). SPEC §9.
 export const ICON_MAX_BYTES = 80 * 1024; // 80 KB

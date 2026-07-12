@@ -83,7 +83,7 @@ export const transactions = pgTable("transactions", {
   type: txnTypeEnum("type").notNull(),
   amount: integer("amount").notNull(), // positive whole rupees
   date: date("date").notNull(), // plain calendar date
-  note: text("note"),
+  title: text("title").notNull(),
   categoryId: integer("category_id").references(() => categories.id),
   methodId: integer("method_id").references(() => paymentMethods.id),
   fromAccountId: integer("from_account_id").references(() => accounts.id),

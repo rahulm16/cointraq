@@ -48,7 +48,7 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   date: string; // yyyy-MM-dd, plain calendar date
-  note: string | null;
+  title: string;
   categoryId: number | null;
   methodId: number | null;
   fromAccountId: number | null;

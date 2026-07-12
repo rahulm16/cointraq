@@ -28,13 +28,13 @@ export function buildCsvs(input: {
   const catName = (id: number | null) => categories.find((c) => c.id === id)?.name ?? "";
 
   const txnCsv = toCsv(
-    ["id", "date", "type", "amount", "note", "category", "method", "from_account", "to_account", "income_source", "created_at"],
+    ["id", "date", "type", "amount", "title", "category", "method", "from_account", "to_account", "income_source", "created_at"],
     transactions.map((t) => [
       t.id,
       t.date,
       t.type,
       t.amount,
-      t.note ?? "",
+      t.title,
       catName(t.categoryId),
       methodName(t.methodId),
       accName(t.fromAccountId),

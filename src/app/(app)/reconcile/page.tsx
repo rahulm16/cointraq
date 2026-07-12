@@ -1,6 +1,7 @@
 import { getAccounts, getMethods, getTxnEffects, getSnapshots } from "@/db/queries";
 import { expectedForAll } from "@/lib/compute";
 import { ReconcileClient } from "./reconcile-client";
+import { DateBar, PeriodTransition } from "@/components/period-bar";
 import { APP_NAME } from "@/lib/constants";
 import { todayIST } from "@/lib/dates";
 
@@ -48,7 +49,10 @@ export default async function ReconcilePage({
 
   return (
     <main className="max-w-[1120px] mx-auto p-4 lg:p-8">
-      <ReconcileClient asOf={asOf} today={today} rows={rows} history={history} />
+      <DateBar date={asOf} max={today} />
+      <PeriodTransition periodKey={asOf}>
+        <ReconcileClient asOf={asOf} today={today} rows={rows} history={history} />
+      </PeriodTransition>
     </main>
   );
 }

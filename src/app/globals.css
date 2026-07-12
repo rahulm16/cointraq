@@ -160,7 +160,7 @@ html[data-sidebar-pinned] {
 /*
   Sidebar rail (§2). Width/labels are CSS-driven so the pinned state (html attr,
   set pre-paint) renders correctly on first paint with zero hydration drift.
-  Hover-expand toggles data-expanded from React after mount.
+  Collapsed rail shows page-name tooltips on icon hover; pin expands labels.
 */
 .rail {
   width: 68px;
@@ -230,11 +230,9 @@ html[data-sidebar-pinned] .rail .rail-when-expanded {
   transform: scale(0.98);
 }
 
-/* Visible focus for keyboard users on icon-only controls. */
+/* No focus chrome — caret / selection state is enough. */
 :focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
-  border-radius: 6px;
+  outline: none;
 }
 
 /* Reduced motion: kill CSS transitions/animations app-wide. */

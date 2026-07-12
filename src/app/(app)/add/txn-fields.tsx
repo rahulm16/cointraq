@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import { Avatar } from "@/components/ui";
 import { cn, categoryClasses } from "@/lib/ui";
-import { CATEGORY_COLORS, CATEGORY_COLOR_HEX, type CategoryColor } from "@/lib/constants";
+import { CATEGORY_COLORS, CATEGORY_COLOR_HEX, TITLE_MAX, type CategoryColor } from "@/lib/constants";
 import { quickCreateCategory } from "@/actions/categories";
 import { cycleContaining } from "@/lib/cycle";
 import { formatDayShort } from "@/lib/dates";
-import { subDays } from "date-fns";
-import { parseDate, toDateStr } from "@/lib/dates";
+import { DateFieldControl } from "@/components/date-picker";
+import { SelectMenu } from "@/components/select-menu";
 
-export function AmountInput({ defaultValue }: { defaultValue?: number }) {
+export function AmountInput({ defaultValue, autoFocus }: { defaultValue?: number; autoFocus?: boolean }) {
   return (
-    <div className="flex items-center gap-2 h-14 px-4 rounded-inner bg-surface-raised border border-transparent focus-within:border-primary">
+    <div className="flex items-center gap-2 h-14 px-4 rounded-inner bg-surface-raised border border-transparent">
       <span className="tnum text-2xl text-text-faint">₹</span>
       <input
         name="amount"
@@ -22,7 +22,7 @@ export function AmountInput({ defaultValue }: { defaultValue?: number }) {
         inputMode="numeric"
         defaultValue={defaultValue}
         placeholder="0"
-        autoFocus
+        autoFocus={autoFocus}
         className="flex-1 bg-transparent outline-none tnum text-3xl text-text-primary placeholder:text-text-faint w-full"
       />
     </div>
@@ -90,38 +90,81 @@ export function CcHint({ billingDay, date }: { billingDay: number; date: string 
 }
 
 export function DateField({ today, defaultValue }: { today: string; defaultValue?: string }) {
-  const [date, setDate] = useState(defaultValue ?? today);
-  const yesterday = toDateStr(subDays(parseDate(today), 1));
+  return <DateFieldControl name="date" today={today} defaultValue={defaultValue} max={today} />;
+}
+
+/**
+ * Title field with type-scoped suggestions. Picking a suggestion only fills this
+ * form — it never edits other transactions.
+ */
+export function TitleInput({
+  suggestions,
+  defaultValue,
+  placeholder,
+}: {
+  suggestions: string[];
+  defaultValue?: string;
+  placeholder?: string;
+}) {
+  const [query, setQuery] = useState(defaultValue ?? "");
+  const [open, setOpen] = useState(false);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    // Only suggest after the user has typed something.
+    if (!q) return [];
+    return suggestions
+      .filter((s) => s.toLowerCase().includes(q) && s.toLowerCase() !== q)
+      .slice(0, 8);
+  }, [query, suggestions]);
+
   return (
-    <div className="flex items-center gap-2">
+    <div className="relative">
       <input
-        name="date"
-        type="date"
-        value={date}
-        max={today}
-        onChange={(e) => setDate(e.target.value)}
-        className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] tnum text-text-primary focus:border-primary"
+        name="title"
+        maxLength={TITLE_MAX}
+        autoComplete="off"
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={(e) => {
+          setQuery(e.target.value);
+          setOpen(e.target.value.trim().length > 0);
+        }}
+        onBlur={() => {
+          // Delay so a mousedown on a suggestion can fire first.
+          window.setTimeout(() => setOpen(false), 120);
+        }}
+        className="h-10 w-full px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary placeholder:text-text-faint"
       />
-      <button
-        type="button"
-        onClick={() => setDate(today)}
-        className={cn(
-          "h-9 px-3 rounded-full text-[12.5px] font-medium pressable",
-          date === today ? "bg-primary/15 text-primary" : "bg-surface-raised text-text-secondary",
-        )}
-      >
-        Today
-      </button>
-      <button
-        type="button"
-        onClick={() => setDate(yesterday)}
-        className={cn(
-          "h-9 px-3 rounded-full text-[12.5px] font-medium pressable",
-          date === yesterday ? "bg-primary/15 text-primary" : "bg-surface-raised text-text-secondary",
-        )}
-      >
-        Yesterday
-      </button>
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 left-0 right-0 mt-1 max-h-48 overflow-auto rounded-control bg-surface border border-border py-1">
+          {filtered.map((s) => (
+            <li key={s}>
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 text-[14px] text-text-primary hover:bg-surface-raised pressable"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={(e) => {
+                  const input = e.currentTarget
+                    .closest(".relative")
+                    ?.querySelector<HTMLInputElement>('input[name="title"]');
+                  if (input) {
+                    input.value = s;
+                    setQuery(s);
+                  }
+                  setOpen(false);
+                }}
+              >
+                {s}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
@@ -184,11 +227,10 @@ export function CategoryPicker({
               type="button"
               onClick={() => setSelected(c.id)}
               className={cn(
-                "h-8 px-3 rounded-full text-[12.5px] font-medium",
+                "h-8 px-3 rounded-full text-[12.5px] font-medium pressable",
                 cc.pill,
-                active && "ring-2 ring-offset-1 ring-offset-surface",
+                active ? "font-semibold" : "opacity-80",
               )}
-              style={active ? { boxShadow: `0 0 0 2px ${CATEGORY_COLOR_HEX[c.color].solid}` } : undefined}
             >
               {c.name}
             </button>
@@ -211,7 +253,7 @@ export function CategoryPicker({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Category name"
-            className="h-9 px-3 rounded-control bg-surface border border-transparent outline-none text-[14px] focus:border-primary"
+            className="h-9 px-3 rounded-control bg-surface border border-transparent outline-none text-[14px]"
           />
           <div className="flex flex-wrap gap-2">
             {CATEGORY_COLORS.map((c) => (
@@ -256,18 +298,16 @@ export function AccountSelect({
   defaultId?: number | null;
   placeholder?: string;
 }) {
+  const options = [
+    ...(placeholder ? [{ value: "", label: placeholder }] : []),
+    ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
+  ];
   return (
-    <select
+    <SelectMenu
       name={name}
-      defaultValue={defaultId ?? ""}
-      className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full"
-    >
-      {placeholder && <option value="">{placeholder}</option>}
-      {accounts.map((a) => (
-        <option key={a.id} value={a.id}>
-          {a.name}
-        </option>
-      ))}
-    </select>
+      defaultValue={defaultId != null ? String(defaultId) : ""}
+      options={options}
+      placeholder={placeholder ?? "Select account"}
+    />
   );
 }

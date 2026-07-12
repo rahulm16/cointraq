@@ -44,14 +44,14 @@ export function MethodForm({
       </Field>
 
       <Field label="Linked account" error={state.errors?.accountId} hint="The account money leaves when this method is used.">
-        <Select name="accountId" defaultValue={method?.accountId ?? accounts[0]?.id}>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-              {a.type === "credit_card" ? " (credit card)" : ""}
-            </option>
-          ))}
-        </Select>
+        <Select
+          name="accountId"
+          defaultValue={method?.accountId ?? accounts[0]?.id}
+          options={accounts.map((a) => ({
+            value: String(a.id),
+            label: a.type === "credit_card" ? `${a.name} (credit card)` : a.name,
+          }))}
+        />
       </Field>
 
       <div className="flex justify-end pt-2">

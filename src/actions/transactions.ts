@@ -6,9 +6,10 @@ import { z } from "zod";
 import { db } from "@/db/client";
 import { transactions, accounts, paymentMethods } from "@/db/schema";
 import { requireAuth, okResult, errResult, type ActionResult } from "./shared";
-import { amountSchema, dateSchema, noteSchema, incomeSourceSchema, fieldErrors } from "@/lib/validation";
+import { amountSchema, dateSchema, titleSchema, incomeSourceSchema, fieldErrors } from "@/lib/validation";
 import { todayIST } from "@/lib/dates";
 import { deriveSpendType, categoryAllowed } from "@/lib/txn-rules";
+import { INCOME_SOURCE_LABEL } from "@/lib/txn-display";
 import type { AccountType, TransactionType } from "@/lib/types";
 
 /*
@@ -26,30 +27,51 @@ interface Lookups {
   accountType: Map<number, AccountType>;
   methodAccountType: Map<number, AccountType>;
   methodAccountId: Map<number, number>;
+  methodName: Map<number, string>;
 }
 
 async function loadLookups(): Promise<Lookups> {
   const accs = await db.select({ id: accounts.id, type: accounts.type }).from(accounts);
   const meths = await db
-    .select({ id: paymentMethods.id, accountId: paymentMethods.accountId })
+    .select({ id: paymentMethods.id, accountId: paymentMethods.accountId, name: paymentMethods.name })
     .from(paymentMethods);
   const accountType = new Map(accs.map((a) => [a.id, a.type]));
   const methodAccountId = new Map(meths.map((m) => [m.id, m.accountId]));
   const methodAccountType = new Map(
     meths.map((m) => [m.id, accountType.get(m.accountId) ?? ("bank" as AccountType)]),
   );
-  return { accountType, methodAccountType, methodAccountId };
+  const methodName = new Map(meths.map((m) => [m.id, m.name]));
+  return { accountType, methodAccountType, methodAccountId, methodName };
 }
 
 function futureRejected(date: string): boolean {
   return date > todayIST();
 }
 
+/** Type-aware default when the user leaves title blank. */
+function defaultTitle(
+  kind: FormKind,
+  ctx: { methodId?: number | null; incomeSource?: string | null; methodName: Map<number, string> },
+): string {
+  switch (kind) {
+    case "spend":
+      return (ctx.methodId != null ? ctx.methodName.get(ctx.methodId) : undefined) ?? "Spend";
+    case "bill_pay":
+      return "credit card bill";
+    case "transfer":
+      return "Transfer";
+    case "withdrawal":
+      return "Withdrawal";
+    case "income":
+      return INCOME_SOURCE_LABEL[ctx.incomeSource ?? "other"] ?? "Income";
+  }
+}
+
 interface BuiltTxn {
   type: TransactionType;
   amount: number;
   date: string;
-  note: string | null;
+  title: string;
   categoryId: number | null;
   methodId: number | null;
   fromAccountId: number | null;
@@ -64,18 +86,18 @@ async function buildTxn(
   lk: Lookups,
 ): Promise<{ ok: true; txn: BuiltTxn } | { ok: false; errors: Record<string, string> }> {
   const base = z
-    .object({ amount: amountSchema, date: dateSchema, note: noteSchema })
+    .object({ amount: amountSchema, date: dateSchema, title: titleSchema })
     .safeParse({
       amount: Number(form.get("amount")),
       date: String(form.get("date") ?? ""),
-      note: (form.get("note") as string) || undefined,
+      title: (form.get("title") as string) || undefined,
     });
   if (!base.success) return { ok: false, errors: fieldErrors(base.error) };
   if (futureRejected(base.data.date)) return { ok: false, errors: { date: "Future dates aren't allowed" } };
 
   const amount = base.data.amount;
   const date = base.data.date;
-  const note = base.data.note?.trim() ? base.data.note.trim() : null;
+  const typedTitle = base.data.title?.trim() ? base.data.title.trim() : null;
 
   const num = (k: string): number | null => {
     const v = form.get(k);
@@ -98,7 +120,7 @@ async function buildTxn(
           type,
           amount,
           date,
-          note,
+          title: typedTitle ?? defaultTitle(kind, { methodId, methodName: lk.methodName }),
           categoryId: categoryAllowed(type) ? categoryId : null,
           methodId,
           fromAccountId: null,
@@ -124,7 +146,7 @@ async function buildTxn(
           type: "bill_pay",
           amount,
           date,
-          note: note ?? "credit card bill",
+          title: typedTitle ?? defaultTitle(kind, { methodName: lk.methodName }),
           categoryId: null,
           methodId,
           fromAccountId: null,
@@ -149,7 +171,7 @@ async function buildTxn(
           type: "transfer",
           amount,
           date,
-          note,
+          title: typedTitle ?? defaultTitle(kind, { methodName: lk.methodName }),
           categoryId: null,
           methodId: null,
           fromAccountId,
@@ -172,7 +194,7 @@ async function buildTxn(
           type: "withdrawal",
           amount,
           date,
-          note,
+          title: typedTitle ?? defaultTitle(kind, { methodName: lk.methodName }),
           categoryId: null,
           methodId: null,
           fromAccountId,
@@ -194,7 +216,7 @@ async function buildTxn(
           type: "income",
           amount,
           date,
-          note,
+          title: typedTitle ?? defaultTitle(kind, { incomeSource: src.data, methodName: lk.methodName }),
           categoryId: null,
           methodId: null,
           fromAccountId: null,
@@ -223,6 +245,7 @@ export async function createTransaction(_prev: ActionResult, form: FormData): Pr
   await db.insert(transactions).values(built.txn);
   revalidatePath("/");
   revalidatePath("/transactions");
+  revalidatePath("/add");
   return okResult("Saved");
 }
 
@@ -243,6 +266,7 @@ export async function updateTransaction(_prev: ActionResult, form: FormData): Pr
     .where(eq(transactions.id, id));
   revalidatePath("/");
   revalidatePath("/transactions");
+  revalidatePath("/add");
   return okResult("Updated");
 }
 

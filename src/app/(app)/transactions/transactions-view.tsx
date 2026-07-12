@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
+import type { TitlesByKind } from "@/lib/txn-display";
 import { Card, EmptyState } from "@/components/ui";
 import { AppDrawer } from "@/components/drawer";
 import { ConfirmDialog } from "@/components/sheet";
@@ -17,8 +18,12 @@ import { TYPE_LABEL } from "@/lib/txn-display";
 import { cn } from "@/lib/ui";
 import type { TransactionType } from "@/lib/types";
 import { Search, Filter, Wallet, Landmark, Tag, ChevronDown, type LucideIcon } from "lucide-react";
+import { SelectMenu, type SelectOption } from "@/components/select-menu";
 
 const TYPES: TransactionType[] = ["expense", "cc_spend", "bill_pay", "transfer", "withdrawal", "income"];
+
+const CHROME =
+  "bg-surface text-text-primary shadow-[var(--shadow-card)]";
 
 export function TransactionsView({
   transactions,
@@ -27,6 +32,7 @@ export function TransactionsView({
   categories,
   summary,
   today,
+  titlesByKind,
   filters,
 }: {
   transactions: Transaction[];
@@ -35,6 +41,7 @@ export function TransactionsView({
   categories: Category[];
   summary: { count: number; total: number; heroCount: number };
   today: string;
+  titlesByKind: TitlesByKind;
   filters: {
     type?: string;
     methodId?: number;
@@ -74,87 +81,108 @@ export function TransactionsView({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search */}
       <form onSubmit={submitSearch} className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-control bg-surface-raised border border-transparent focus-within:border-primary">
-          <Search size={16} strokeWidth={1.5} className="text-text-faint" />
+        <div className={cn("flex-1 flex items-center gap-2 h-10 px-3 rounded-control", CHROME)}>
+          <Search size={16} strokeWidth={1.5} className="text-text-secondary" />
           <input
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Search notes"
-            className="flex-1 bg-transparent outline-none text-[14px] text-text-primary placeholder:text-text-faint"
+            placeholder="Search titles"
+            className="flex-1 bg-transparent outline-none text-[14px] text-text-primary placeholder:text-text-secondary"
           />
           {searchText && (
-            <button type="button" onClick={() => { setSearchText(""); setParam("q", undefined); }} className="text-text-faint text-[13px]">
+            <button
+              type="button"
+              onClick={() => {
+                setSearchText("");
+                setParam("q", undefined);
+              }}
+              className="text-text-secondary text-[13px] font-medium"
+            >
               Clear
             </button>
           )}
         </div>
       </form>
 
-      {/* Filters — icon chips that light up + show a dot when active (§7) */}
       <div className="flex flex-wrap gap-2">
-        <FilterChip icon={Filter} label="Type" active={!!filters.type} value={filters.type ?? ""} onChange={(v) => setParam("type", v || undefined)}>
-          <option value="">All types</option>
-          {TYPES.map((t) => (
-            <option key={t} value={t}>{TYPE_LABEL[t]}</option>
-          ))}
-        </FilterChip>
-        <FilterChip icon={Wallet} label="Method" active={!!filters.methodId} value={filters.methodId ? String(filters.methodId) : ""} onChange={(v) => setParam("method", v || undefined)}>
-          <option value="">All methods</option>
-          {methods.map((m) => (
-            <option key={m.id} value={m.id}>{m.name}</option>
-          ))}
-        </FilterChip>
-        <FilterChip icon={Landmark} label="Account" active={!!filters.accountId} value={filters.accountId ? String(filters.accountId) : ""} onChange={(v) => setParam("account", v || undefined)}>
-          <option value="">All accounts</option>
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
-        </FilterChip>
-        <FilterChip icon={Tag} label="Category" active={!!filters.categoryId} value={filters.categoryId ? String(filters.categoryId) : ""} onChange={(v) => setParam("category", v || undefined)}>
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </FilterChip>
+        <FilterChip
+          icon={Filter}
+          label="Type"
+          active={!!filters.type}
+          value={filters.type ?? ""}
+          options={[
+            { value: "", label: "All types" },
+            ...TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] })),
+          ]}
+          onChange={(v) => setParam("type", v || undefined)}
+        />
+        <FilterChip
+          icon={Wallet}
+          label="Method"
+          active={!!filters.methodId}
+          value={filters.methodId ? String(filters.methodId) : ""}
+          options={[
+            { value: "", label: "All methods" },
+            ...methods.map((m) => ({ value: String(m.id), label: m.name })),
+          ]}
+          onChange={(v) => setParam("method", v || undefined)}
+        />
+        <FilterChip
+          icon={Landmark}
+          label="Account"
+          active={!!filters.accountId}
+          value={filters.accountId ? String(filters.accountId) : ""}
+          options={[
+            { value: "", label: "All accounts" },
+            ...accounts.map((a) => ({ value: String(a.id), label: a.name })),
+          ]}
+          onChange={(v) => setParam("account", v || undefined)}
+        />
+        <FilterChip
+          icon={Tag}
+          label="Category"
+          active={!!filters.categoryId}
+          value={filters.categoryId ? String(filters.categoryId) : ""}
+          options={[
+            { value: "", label: "All categories" },
+            ...categories.map((c) => ({ value: String(c.id), label: c.name })),
+          ]}
+          onChange={(v) => setParam("category", v || undefined)}
+        />
       </div>
 
-      {/* Summary line */}
-      <div className="flex items-center justify-between px-3 py-2.5 rounded-control bg-surface-raised border border-transparent">
-        <span className="text-[12.5px] tnum text-text-secondary">
+      <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-control", CHROME)}>
+        <span className="text-[12.5px] tnum font-medium text-text-primary">
           {summary.count} transaction{summary.count === 1 ? "" : "s"}
         </span>
-        <span className="text-[12.5px] text-text-secondary">
+        <span className="text-[12.5px] font-medium text-text-primary">
           Spends{" "}
-          <span className="font-medium text-text-primary">
+          <span className="tnum font-semibold">
             <INRFlow value={summary.total} />
           </span>
         </span>
       </div>
 
-      {/* Grouped list */}
       {transactions.length === 0 ? (
-        <EmptyState title="No transactions" body="Nothing matches these filters this month." />
+        <EmptyState title="No transactions" body="Nothing matches these filters in this period." />
       ) : (
         <div className="flex flex-col gap-4">
           {grouped.map(([date, items]) => (
             <div key={date} className="flex flex-col gap-1">
-              {/* Sticky date header — elevates with a blur when it sticks (§8). */}
-              <div className="sticky top-0 z-10 -mx-1 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-text-faint bg-background/70 backdrop-blur-md rounded-lg">
+              <div className="sticky top-[68px] z-10 -mx-1 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] text-text-faint bg-background/70 backdrop-blur-md rounded-lg">
                 {formatDayLabel(date)}
               </div>
-              <Card className="!p-0">
-                <div className="px-4">
-                  <AnimatePresence initial={false}>
-                    {items.map((t) => (
-                      <motion.div
-                        key={t.id}
-                        layout
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={fadeTransition(DUR.base)}
-                        className="overflow-hidden border-b border-border last:border-0"
-                      >
+              <Card className="!p-0 overflow-hidden">
+                <AnimatePresence initial={false}>
+                  {items.map((t) => (
+                    <motion.div
+                      key={t.id}
+                      layout
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={fadeTransition(DUR.base)}
+                      className="border-b border-border last:border-b-0"
+                    >
                         <TxnRow
                           txn={t}
                           accounts={accounts}
@@ -162,11 +190,11 @@ export function TransactionsView({
                           categories={categories}
                           onClick={() => setEditing(t)}
                           onDelete={() => setConfirming(t)}
+                          className="border-b-0"
                         />
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </Card>
             </div>
           ))}
@@ -181,6 +209,7 @@ export function TransactionsView({
             methods={methods}
             categories={categories}
             today={today}
+            titlesByKind={titlesByKind}
             onDone={() => setEditing(null)}
           />
         )}
@@ -209,37 +238,52 @@ function FilterChip({
   label,
   value,
   active,
+  options,
   onChange,
-  children,
 }: {
   icon: LucideIcon;
   label: string;
   value: string;
   active: boolean;
+  options: SelectOption[];
   onChange: (v: string) => void;
-  children: React.ReactNode;
 }) {
-  // Native select stays for accessibility (full text in the open dropdown),
-  // overlaid transparently on a chip that shows the icon + active dot.
   return (
-    <div
-      className={cn(
-        "relative h-9 inline-flex items-center gap-1.5 pl-3 pr-2.5 rounded-full text-[12.5px] font-medium pressable",
-        active ? "bg-primary/12 text-primary" : "bg-surface-raised text-text-secondary",
+    <SelectMenu
+      value={value}
+      options={options}
+      onChange={onChange}
+      renderTrigger={({ open, toggle }) => (
+        <button
+          type="button"
+          onClick={toggle}
+          aria-label={label}
+          aria-expanded={open}
+          className={cn(
+            "h-9 inline-flex items-center gap-1.5 pl-3 pr-2.5 rounded-full text-[12.5px] font-semibold pressable transition-colors",
+            open
+              ? "bg-primary text-primary-contrast shadow-[var(--shadow-card)]"
+              : active
+                ? "bg-primary/15 text-primary"
+                : CHROME,
+          )}
+        >
+          <Icon size={14} strokeWidth={1.75} aria-hidden />
+          <span>{label}</span>
+          {active && (
+            <span
+              className={cn("w-1.5 h-1.5 rounded-full", open ? "bg-primary-contrast" : "bg-primary")}
+              aria-hidden
+            />
+          )}
+          <ChevronDown
+            size={13}
+            strokeWidth={1.75}
+            className={cn("opacity-60 transition-transform", open && "rotate-180")}
+            aria-hidden
+          />
+        </button>
       )}
-    >
-      <Icon size={14} strokeWidth={1.75} aria-hidden />
-      <span>{label}</span>
-      {active && <span className="w-1.5 h-1.5 rounded-full bg-primary" aria-hidden />}
-      <ChevronDown size={13} strokeWidth={1.75} className="opacity-60" aria-hidden />
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-      >
-        {children}
-      </select>
-    </div>
+    />
   );
 }

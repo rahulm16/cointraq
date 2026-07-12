@@ -1,7 +1,8 @@
 "use client";
 
 import { cn } from "@/lib/ui";
-import type { ReactNode, InputHTMLAttributes, SelectHTMLAttributes } from "react";
+import type { ReactNode, InputHTMLAttributes } from "react";
+import { SelectMenu } from "@/components/select-menu";
 
 export function Field({
   label,
@@ -36,9 +37,9 @@ export function TextInput({
     <input
       {...props}
       className={cn(
-        // Borderless (§1): affordance from the raised surface step; focus ring in primary.
+        // Borderless: affordance from the raised surface step; caret shows focus.
         "h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary",
-        "focus:border-primary placeholder:text-text-faint",
+        "placeholder:text-text-faint",
         numeric && "tnum",
         className,
       )}
@@ -46,17 +47,57 @@ export function TextInput({
   );
 }
 
-export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+export function Select({
+  name,
+  value,
+  defaultValue,
+  onChange,
+  options,
+  placeholder,
+  className,
+  children,
+}: {
+  name?: string;
+  value?: string;
+  defaultValue?: string | number;
+  onChange?: (e: { target: { value: string } }) => void;
+  options?: { value: string; label: string }[];
+  placeholder?: string;
+  className?: string;
+  /** Legacy: option children — prefer `options` prop. */
+  children?: ReactNode;
+}) {
+  // Support both options[] and legacy <option> children.
+  const parsed: { value: string; label: string }[] = options
+    ? options
+    : (() => {
+        const out: { value: string; label: string }[] = [];
+        const walk = (nodes: ReactNode) => {
+          for (const child of Array.isArray(nodes) ? nodes : [nodes]) {
+            if (!child || typeof child !== "object") continue;
+            const el = child as { type?: unknown; props?: { value?: string | number; children?: ReactNode } };
+            if (el.type === "option" && el.props) {
+              out.push({
+                value: String(el.props.value ?? ""),
+                label: String(el.props.children ?? ""),
+              });
+            }
+          }
+        };
+        walk(children);
+        return out;
+      })();
+
   return (
-    <select
-      {...props}
-      className={cn(
-        "h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary",
-        className,
-      )}
-    >
-      {children}
-    </select>
+    <SelectMenu
+      name={name}
+      value={value}
+      defaultValue={defaultValue != null ? String(defaultValue) : undefined}
+      options={parsed}
+      placeholder={placeholder}
+      className={className}
+      onChange={(v) => onChange?.({ target: { value: v } })}
+    />
   );
 }
 

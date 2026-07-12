@@ -5,12 +5,12 @@ import {
   getTxnEffects,
   getSnapshots,
   getRecentTransactions,
+  getTitlesByKind,
 } from "@/db/queries";
 import { buildDashboard } from "@/lib/dashboard";
-import { monthKey, todayIST } from "@/lib/dates";
+import { monthKey, resolvePeriod, todayIST } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
-import { MonthSwitcher } from "@/components/month-switcher";
-import { MonthTransition } from "@/components/month-transition";
+import { PeriodBar, PeriodTransition } from "@/components/period-bar";
 import { Entrance, EntranceItem } from "@/components/entrance";
 import { INRFlow } from "@/components/inr-flow";
 import { Card, Eyebrow, EmptyState } from "@/components/ui";
@@ -32,18 +32,18 @@ export default async function DashboardPage({
   const sp = await searchParams;
   const today = todayIST();
   const nowMonth = monthKey(today);
-  const month = typeof sp.m === "string" ? sp.m : nowMonth;
+  const { from, to } = resolvePeriod(sp, today);
 
-  const [accounts, methods, categories, effects, snapshots, recent] = await Promise.all([
+  const [accounts, methods, categories, effects, snapshots, recent, titlesByKind] = await Promise.all([
     getAccounts(true),
     getMethods(true),
     getCategories(true),
     getTxnEffects(),
     getSnapshots(),
-    getRecentTransactions(8),
+    getRecentTransactions(8, { from, to }),
+    getTitlesByKind(),
   ]);
 
-  // First-run empty dashboard.
   if (effects.length === 0) {
     return (
       <main className="max-w-[1120px] mx-auto p-4 lg:p-8">
@@ -60,40 +60,36 @@ export default async function DashboardPage({
     );
   }
 
-  const d = buildDashboard({ month, accounts, methods, categories, effects, snapshots, recent });
+  const d = buildDashboard({ from, to, accounts, methods, categories, effects, snapshots, recent });
   const lower = d.delta < 0;
   const topColor = d.top?.color ? categoryClasses(d.top.color).text : "text-text-secondary";
+  const deltaLabel = d.isFullMonth ? "than last month" : "than prior period";
 
   return (
     <main className="max-w-[1120px] mx-auto p-4 lg:p-8">
-      <div className="mb-4">
-        <MonthSwitcher month={month} maxMonth={nowMonth} />
-      </div>
+      <PeriodBar from={from} to={to} maxMonth={nowMonth} />
 
-      <MonthTransition month={month}>
+      <PeriodTransition periodKey={`${from}_${to}`}>
       <Entrance>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        {/* Left/main column */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          {/* Hero */}
           <EntranceItem
-            className="rounded-[24px] p-[24px_22px] bg-primary shadow-[var(--shadow-hero)]"
+            className="rounded-[24px] p-[24px_22px] bg-primary/12"
           >
-            <Eyebrow className="!text-primary-contrast/70">Spent in {monthLabel(month)}</Eyebrow>
-            <div className="text-[46px] leading-[1.15] mt-2" style={{ color: "var(--hero-amount)" }}>
+            <Eyebrow className="!text-primary/75">Spent · {d.periodLabel}</Eyebrow>
+            <div className="text-[46px] leading-[1.15] mt-2 text-text-primary">
               <INRFlow value={d.hero} />
             </div>
             {d.delta !== 0 && (
-              <div className={`flex items-center gap-1.5 mt-2.5 text-[13px] font-medium ${lower ? "text-income" : "text-primary-contrast/90"}`}>
+              <div className={`flex items-center gap-1.5 mt-2.5 text-[13px] font-medium ${lower ? "text-income" : "text-primary"}`}>
                 {lower ? <TrendingDown size={14} strokeWidth={1.75} /> : <TrendingUp size={14} strokeWidth={1.75} />}
                 <span>
-                  <span className="tnum">{formatINR(Math.abs(d.delta))}</span> {lower ? "less" : "more"} than last month
+                  <span className="tnum">{formatINR(Math.abs(d.delta))}</span> {lower ? "less" : "more"} {deltaLabel}
                 </span>
               </div>
             )}
           </EntranceItem>
 
-          {/* Stat row — icon + eyebrow, value carries the meaning (§7) */}
           <EntranceItem className="grid grid-cols-3 gap-2.5">
             <Card lift className="!p-[12px_12px_14px]">
               <Eyebrow className="!text-[10px] flex items-center gap-1.5">
@@ -128,7 +124,6 @@ export default async function DashboardPage({
             </Card>
           </EntranceItem>
 
-          {/* Daily bars */}
           <EntranceItem>
             <Card>
               <Eyebrow>Daily spend</Eyebrow>
@@ -138,7 +133,6 @@ export default async function DashboardPage({
             </Card>
           </EntranceItem>
 
-          {/* Category donut + method bars */}
           <EntranceItem className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <Eyebrow>By category</Eyebrow>
@@ -154,7 +148,6 @@ export default async function DashboardPage({
             </Card>
           </EntranceItem>
 
-          {/* Trend */}
           <EntranceItem>
             <Card>
               <Eyebrow>6-month trend</Eyebrow>
@@ -165,7 +158,6 @@ export default async function DashboardPage({
           </EntranceItem>
         </div>
 
-        {/* Right column: CC widgets + recent */}
         <div className="flex flex-col gap-4">
           {d.cards.map((c) => (
             <EntranceItem key={c.account.id}>
@@ -179,17 +171,13 @@ export default async function DashboardPage({
               methods={methods}
               categories={categories}
               today={today}
+              titlesByKind={titlesByKind}
             />
           </EntranceItem>
         </div>
       </div>
       </Entrance>
-      </MonthTransition>
+      </PeriodTransition>
     </main>
   );
-}
-
-function monthLabel(m: string): string {
-  // "July" from "2026-07"
-  return new Date(m + "-01T00:00:00").toLocaleString("en-US", { month: "long" });
 }

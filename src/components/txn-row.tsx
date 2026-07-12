@@ -2,22 +2,23 @@
 
 import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
 import { Avatar } from "@/components/ui";
+import { SwipeRow } from "@/components/swipe-row";
 import { formatINR } from "@/lib/money";
-import { amountSign, TYPE_LABEL, INCOME_SOURCE_LABEL } from "@/lib/txn-display";
+import { amountSign, INCOME_SOURCE_LABEL } from "@/lib/txn-display";
 import { categoryClasses, cn } from "@/lib/ui";
 import { Pencil, Trash2 } from "lucide-react";
 
 /**
- * One transaction row. Tap opens the edit sheet. On desktop hover, quick edit /
- * delete icon buttons fade-slide in from the right (§6); they're absent on touch.
+ * One transaction row. Tap opens the edit sheet. Desktop hover reveals edit /
+ * delete icons; on touch, swipe right for edit and left for delete.
  */
 export function TxnRow({
   txn,
-  accounts,
   methods,
   categories,
   onClick,
   onDelete,
+  className,
 }: {
   txn: Transaction;
   accounts: Account[];
@@ -25,34 +26,23 @@ export function TxnRow({
   categories: Category[];
   onClick?: () => void;
   onDelete?: () => void;
+  className?: string;
 }) {
   const method = methods.find((m) => m.id === txn.methodId);
   const category = categories.find((c) => c.id === txn.categoryId);
-  const from = accounts.find((a) => a.id === txn.fromAccountId);
-  const to = accounts.find((a) => a.id === txn.toAccountId);
   const sign = amountSign(txn.type);
 
-  const title =
-    txn.note ||
-    (txn.type === "transfer"
-      ? `${from?.name ?? "?"} → ${to?.name ?? "?"}`
-      : txn.type === "withdrawal"
-        ? `Withdrawal → ${to?.name ?? "Cash"}`
-        : txn.type === "income"
-          ? INCOME_SOURCE_LABEL[txn.incomeSource ?? "other"] ?? "Income"
-          : txn.type === "bill_pay"
-            ? `Bill · ${to?.name ?? "card"}`
-            : method?.name ?? TYPE_LABEL[txn.type]);
+  const title = txn.title;
 
   const subtitleParts: string[] = [];
   if (method) subtitleParts.push(method.name);
   if (txn.type === "cc_spend") subtitleParts.push("card ledger");
   if (txn.type === "income" && txn.incomeSource) subtitleParts.push(INCOME_SOURCE_LABEL[txn.incomeSource]);
 
-  return (
-    <div className="group relative flex items-center gap-3 py-3 -mx-1 px-1 rounded-inner transition-colors hover:bg-surface-raised/50">
+  const row = (
+    <div className="group relative flex items-center gap-3 px-4 py-3 transition-colors can-hover:hover:bg-surface-raised/50">
       {/* Full-row click target sits behind the hover actions. */}
-      <button onClick={onClick} aria-label={`Edit ${title}`} className="absolute inset-0 rounded-inner" />
+      {onClick && <button type="button" onClick={onClick} aria-label={`Edit ${title}`} className="absolute inset-0" />}
 
       <Avatar icon={method?.icon} name={method?.name ?? title} size={36} />
       <div className="min-w-0 flex-1 pointer-events-none">
@@ -84,6 +74,7 @@ export function TxnRow({
       {onDelete && (
         <div className="hidden can-hover:flex absolute right-1 items-center gap-1 opacity-0 translate-x-2 pointer-events-none transition-all duration-150 group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto">
           <button
+            type="button"
             onClick={onClick}
             aria-label="Edit"
             className="icon-btn w-8 h-8 rounded-full flex items-center justify-center text-text-secondary"
@@ -91,6 +82,7 @@ export function TxnRow({
             <Pencil size={15} strokeWidth={1.75} />
           </button>
           <button
+            type="button"
             onClick={onDelete}
             aria-label="Delete"
             className="icon-btn w-8 h-8 rounded-full flex items-center justify-center text-text-secondary hover:!text-alert"
@@ -100,5 +92,37 @@ export function TxnRow({
         </div>
       )}
     </div>
+  );
+
+  if (!onClick && !onDelete) {
+    return <div className={cn("border-b border-border", className)}>{row}</div>;
+  }
+
+  return (
+    <SwipeRow
+      className={cn("border-b border-border", className)}
+      leftAction={
+        onClick
+          ? {
+              label: "Edit",
+              onClick,
+              className: "bg-primary",
+              icon: <Pencil size={16} strokeWidth={1.75} />,
+            }
+          : undefined
+      }
+      rightAction={
+        onDelete
+          ? {
+              label: "Delete",
+              onClick: onDelete,
+              className: "bg-alert",
+              icon: <Trash2 size={16} strokeWidth={1.75} />,
+            }
+          : undefined
+      }
+    >
+      {row}
+    </SwipeRow>
   );
 }

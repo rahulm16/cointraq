@@ -8,6 +8,13 @@
       "when": 1783858901796,
       "tag": "0000_stormy_morph",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783860000000,
+      "tag": "0001_title_replaces_note",
+      "breakpoints": true
     }
   ]
 }

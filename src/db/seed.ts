@@ -77,12 +77,12 @@ async function seed() {
       date: dayOf(mk, 1),
       toAccountId: hdfc.id,
       incomeSource: "salary",
-      note: "Monthly salary",
+      title: "Monthly salary",
     });
 
     // Regular expenses (non-CC), varied methods & categories.
     const expenses: [number, number, number, number, string][] = [
-      // [day, amount, methodId, categoryId, note]
+      // [day, amount, methodId, categoryId, title]
       [2, 240, gpay.id, food.id, "chai & snacks"],
       [3, 1850, phonepe.id, groceries.id, "big basket"],
       [4, 120, cashMethod.id, food.id, "auto"],
@@ -98,8 +98,8 @@ async function seed() {
       [26, 260, gpay.id, travel.id, "uber"],
       [28, 1200, phonepe.id, shopping.id, "books"],
     ];
-    for (const [day, amount, methodId, categoryId, note] of expenses) {
-      rows.push({ type: "expense", amount, date: dayOf(mk, day), methodId, categoryId, note });
+    for (const [day, amount, methodId, categoryId, title] of expenses) {
+      rows.push({ type: "expense", amount, date: dayOf(mk, day), methodId, categoryId, title });
     }
 
     // Credit-card spends (informational ledger).
@@ -110,8 +110,8 @@ async function seed() {
       [20, 1900, fun.id, "concert tickets"],
       [25, 4100, groceries.id, "costco run"],
     ];
-    for (const [day, amount, categoryId, note] of ccSpends) {
-      rows.push({ type: "cc_spend", amount, date: dayOf(mk, day), methodId: ccMethod.id, categoryId, note });
+    for (const [day, amount, categoryId, title] of ccSpends) {
+      rows.push({ type: "cc_spend", amount, date: dayOf(mk, day), methodId: ccMethod.id, categoryId, title });
     }
 
     // Bill payment for the previous cycle (counts as a spend).
@@ -122,16 +122,16 @@ async function seed() {
         date: dayOf(mk, 19),
         methodId: debit.id,
         toAccountId: hdfcCC.id,
-        note: "credit card bill",
+        title: "credit card bill",
       });
     }
 
     // A transfer and a withdrawal (neither is a spend).
-    rows.push({ type: "transfer", amount: 10000, date: dayOf(mk, 6), fromAccountId: karnataka.id, toAccountId: hdfc.id, note: "top-up HDFC" });
-    rows.push({ type: "withdrawal", amount: 5000, date: dayOf(mk, 10), fromAccountId: hdfc.id, toAccountId: cash.id, note: "ATM" });
+    rows.push({ type: "transfer", amount: 10000, date: dayOf(mk, 6), fromAccountId: karnataka.id, toAccountId: hdfc.id, title: "top-up HDFC" });
+    rows.push({ type: "withdrawal", amount: 5000, date: dayOf(mk, 10), fromAccountId: hdfc.id, toAccountId: cash.id, title: "ATM" });
 
     // A refund income into Karnataka.
-    rows.push({ type: "income", amount: 899, date: dayOf(mk, 12), toAccountId: karnataka.id, incomeSource: "refund", note: "return refund" });
+    rows.push({ type: "income", amount: 899, date: dayOf(mk, 12), toAccountId: karnataka.id, incomeSource: "refund", title: "return refund" });
   }
 
   monthOfActivity(lastMonth, { salary: 95000, billPay: 12800 });

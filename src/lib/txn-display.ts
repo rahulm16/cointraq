@@ -9,8 +9,12 @@ export const TYPE_LABEL: Record<TransactionType, string> = {
   income: "Income",
 };
 
+export type FormKind = "spend" | "bill_pay" | "transfer" | "withdrawal" | "income";
+
+export type TitlesByKind = Record<FormKind, string[]>;
+
 /** Map a stored type back to the add/edit form kind (tab). */
-export function formKindForType(type: TransactionType): "spend" | "bill_pay" | "transfer" | "withdrawal" | "income" {
+export function formKindForType(type: TransactionType): FormKind {
   switch (type) {
     case "expense":
     case "cc_spend":

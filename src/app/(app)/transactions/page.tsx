@@ -1,9 +1,8 @@
-import { getFilteredTransactions, getAccounts, getMethods, getCategories } from "@/db/queries";
-import { MonthSwitcher } from "@/components/month-switcher";
-import { MonthTransition } from "@/components/month-transition";
+import { getFilteredTransactions, getAccounts, getMethods, getCategories, getTitlesByKind } from "@/db/queries";
+import { PeriodBar, PeriodTransition } from "@/components/period-bar";
 import { TransactionsView } from "./transactions-view";
 import { APP_NAME } from "@/lib/constants";
-import { todayIST, monthKey, monthRange } from "@/lib/dates";
+import { todayIST, monthKey, resolvePeriod } from "@/lib/dates";
 import { heroTotal, isHeroCountable } from "@/lib/aggregations";
 import type { Transaction } from "@/lib/types";
 
@@ -15,9 +14,9 @@ export default async function TransactionsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const nowMonth = monthKey(todayIST());
-  const month = typeof sp.m === "string" ? sp.m : nowMonth;
-  const { start, end } = monthRange(month);
+  const today = todayIST();
+  const nowMonth = monthKey(today);
+  const { from, to } = resolvePeriod(sp, today);
 
   const type = typeof sp.type === "string" ? sp.type : undefined;
   const methodId = typeof sp.method === "string" ? Number(sp.method) : undefined;
@@ -25,23 +24,22 @@ export default async function TransactionsPage({
   const accountId = typeof sp.account === "string" ? Number(sp.account) : undefined;
   const search = typeof sp.q === "string" ? sp.q : undefined;
 
-  const [accounts, methods, categories] = await Promise.all([
+  const [accounts, methods, categories, titlesByKind] = await Promise.all([
     getAccounts(true),
     getMethods(true),
     getCategories(true),
+    getTitlesByKind(),
   ]);
 
   let txns = await getFilteredTransactions({
-    monthStart: start,
-    monthEnd: end,
+    from,
+    to,
     type,
     methodId,
     categoryId,
     search,
   });
 
-  // Account filter: match transactions touching the account (from/to or the
-  // method's account). Post-filter since volumes are tiny.
   if (accountId) {
     const methodAccount = new Map(methods.map((m) => [m.id, m.accountId]));
     txns = txns.filter(
@@ -57,20 +55,19 @@ export default async function TransactionsPage({
 
   return (
     <main className="max-w-[900px] mx-auto p-4 lg:p-8">
-      <div className="mb-4">
-        <MonthSwitcher month={month} maxMonth={nowMonth} />
-      </div>
-      <MonthTransition month={month}>
+      <PeriodBar from={from} to={to} maxMonth={nowMonth} />
+      <PeriodTransition periodKey={`${from}_${to}`}>
         <TransactionsView
           transactions={txns}
           accounts={accounts}
           methods={methods}
           categories={categories}
           summary={summary}
-          today={todayIST()}
+          today={today}
+          titlesByKind={titlesByKind}
           filters={{ type, methodId, categoryId, accountId, search }}
         />
-      </MonthTransition>
+      </PeriodTransition>
     </main>
   );
 }

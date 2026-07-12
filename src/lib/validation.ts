@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AMOUNT_MAX, AMOUNT_MIN, NOTE_MAX, ICON_MAX_BYTES, CATEGORY_COLORS } from "./constants";
+import { AMOUNT_MAX, AMOUNT_MIN, TITLE_MAX, ICON_MAX_BYTES, CATEGORY_COLORS } from "./constants";
 import { isValidDateStr } from "./dates";
 
 /* Shared Zod pieces. Every server action validates with these — never trust the client. */
@@ -14,7 +14,8 @@ export const dateSchema = z
   .string()
   .refine(isValidDateStr, "Invalid date");
 
-export const noteSchema = z.string().trim().max(NOTE_MAX, `Max ${NOTE_MAX} characters`).optional();
+/** Empty is allowed — server fills a type-aware default. */
+export const titleSchema = z.string().trim().max(TITLE_MAX, `Max ${TITLE_MAX} characters`).optional();
 
 export const iconSchema = z
   .string()

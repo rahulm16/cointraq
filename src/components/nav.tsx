@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion } from "motion/react";
 import { useTheme } from "next-themes";
 import * as Tooltip from "@radix-ui/react-tooltip";
@@ -53,9 +53,6 @@ export function Sidebar() {
   // Server and first client render agree on false; the real pinned state (already
   // painted via the pre-hydration html attribute + CSS) syncs in the effect below.
   const [pinned, setPinned] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setPinned(document.documentElement.hasAttribute("data-sidebar-pinned"));
@@ -72,24 +69,14 @@ export function Sidebar() {
     });
   }, []);
 
-  // Hover intent: ~120ms before expanding, ~200ms grace before collapsing.
-  const onEnter = () => {
-    if (leaveTimer.current) clearTimeout(leaveTimer.current);
-    enterTimer.current = setTimeout(() => setHovered(true), 120);
-  };
-  const onLeave = () => {
-    if (enterTimer.current) clearTimeout(enterTimer.current);
-    leaveTimer.current = setTimeout(() => setHovered(false), 200);
-  };
-
-  const expanded = hovered || pinned;
+  // Collapsed = icons only; hover shows a tooltip with the page name.
+  // Pin still expands the rail to show labels inline.
+  const expanded = pinned;
 
   return (
-    <Tooltip.Provider delayDuration={300}>
+    <Tooltip.Provider delayDuration={200} skipDelayDuration={0}>
       <aside
-        data-expanded={hovered || undefined}
-        onMouseEnter={onEnter}
-        onMouseLeave={onLeave}
+        data-expanded={expanded || undefined}
         className="rail hidden lg:flex fixed top-3 left-3 bottom-3 z-40 flex-col gap-2 overflow-hidden bg-surface rounded-card p-3 shadow-[var(--shadow-card)]"
       >
         {/* Logo + pin */}
@@ -109,17 +96,20 @@ export function Sidebar() {
           </button>
         </div>
 
-        {/* Add transaction */}
+        {/* Add transaction — compact round button when collapsed */}
         <RailTooltip label="Add transaction" enabled={!expanded}>
           <Link
             href="/add"
             aria-label="Add transaction"
-            className="flex items-center h-10 rounded-control bg-primary text-primary-contrast pressable"
+            className={cn(
+              "flex items-center justify-center bg-primary text-primary-contrast pressable rounded-full",
+              expanded ? "h-10 w-full gap-2 px-3" : "size-8 mx-auto shrink-0",
+            )}
           >
-            <span className="w-11 flex-none flex justify-center">
-              <Plus size={18} strokeWidth={2} />
-            </span>
-            <span className="rail-label text-[13.5px] font-semibold">Add transaction</span>
+            <Plus size={16} strokeWidth={2.25} className="shrink-0" />
+            {expanded && (
+              <span className="text-[13.5px] font-semibold whitespace-nowrap">Add transaction</span>
+            )}
           </Link>
         </RailTooltip>
 
@@ -203,7 +193,7 @@ function ThemeRailButton({ enabled }: { enabled: boolean }) {
   );
 }
 
-/** Radix tooltip to the right of the rail, only when collapsed. */
+/** Radix tooltip to the right of the icon — desktop collapsed rail only. */
 function RailTooltip({
   label,
   enabled,
@@ -213,20 +203,20 @@ function RailTooltip({
   enabled: boolean;
   children: React.ReactNode;
 }) {
+  if (!enabled) return <>{children}</>;
   return (
     <Tooltip.Root>
       <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
-      {enabled && (
-        <Tooltip.Portal>
-          <Tooltip.Content
-            side="right"
-            sideOffset={10}
-            className="z-50 px-2.5 py-1.5 rounded-[10px] bg-surface-overlay text-text-primary text-[12px] font-medium shadow-[var(--shadow-overlay)] select-none"
-          >
-            {label}
-          </Tooltip.Content>
-        </Tooltip.Portal>
-      )}
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="right"
+          sideOffset={12}
+          className="z-50 px-2.5 py-1.5 rounded-[10px] bg-surface-overlay text-text-primary text-[12px] font-medium shadow-[var(--shadow-overlay)] select-none"
+        >
+          {label}
+          <Tooltip.Arrow className="fill-surface-overlay" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
     </Tooltip.Root>
   );
 }

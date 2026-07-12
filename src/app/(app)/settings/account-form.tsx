@@ -37,11 +37,16 @@ export function AccountForm({ account, onDone }: { account: Account | null; onDo
       </Field>
 
       <Field label="Type" error={state.errors?.type}>
-        <Select name="type" value={type} onChange={(e) => setType(e.target.value)}>
-          <option value="bank">Bank</option>
-          <option value="credit_card">Credit card</option>
-          <option value="cash">Cash</option>
-        </Select>
+        <Select
+          name="type"
+          value={type}
+          onChange={(e) => setType(e.target.value)}
+          options={[
+            { value: "bank", label: "Bank" },
+            { value: "credit_card", label: "Credit card" },
+            { value: "cash", label: "Cash" },
+          ]}
+        />
       </Field>
 
       <Field

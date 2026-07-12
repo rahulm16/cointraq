@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useState } from "react";
 import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
+import type { TitlesByKind } from "@/lib/txn-display";
 import { updateTransaction, deleteTransaction } from "@/actions/transactions";
 import type { ActionResult } from "@/actions/shared";
 import { Field, SubmitButton } from "@/components/form";
@@ -14,7 +15,9 @@ import {
   DateField,
   CategoryPicker,
   AccountSelect,
+  TitleInput,
 } from "../add/txn-fields";
+import { SelectMenu } from "@/components/select-menu";
 
 const initial: ActionResult = { ok: false };
 
@@ -28,6 +31,7 @@ export function EditForm({
   methods,
   categories,
   today,
+  titlesByKind,
   onDone,
 }: {
   txn: Transaction;
@@ -35,6 +39,7 @@ export function EditForm({
   methods: PaymentMethod[];
   categories: Category[];
   today: string;
+  titlesByKind: TitlesByKind;
   onDone: () => void;
 }) {
   const kind = formKindForType(txn.type);
@@ -75,6 +80,13 @@ export function EditForm({
         <AmountInput defaultValue={txn.amount} />
         {state.errors?.amount && <p className="text-[12px] text-alert -mt-2">{state.errors.amount}</p>}
         {state.errors?._ && <p className="text-[12px] text-alert">{state.errors._}</p>}
+
+        <Field label="Title" error={state.errors?.title}>
+          <TitleInput
+            suggestions={titlesByKind[kind]}
+            defaultValue={txn.title}
+          />
+        </Field>
 
         {kind === "spend" && (
           <>
@@ -121,27 +133,22 @@ export function EditForm({
               <AccountSelect name="toAccountId" accounts={nonCredit} defaultId={txn.toAccountId} />
             </Field>
             <Field label="Source" error={state.errors?.incomeSource}>
-              <select name="incomeSource" defaultValue={txn.incomeSource ?? "salary"} className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full">
-                <option value="salary">Salary</option>
-                <option value="refund">Refund</option>
-                <option value="cashback">Cashback</option>
-                <option value="other">Other</option>
-              </select>
+              <SelectMenu
+                name="incomeSource"
+                defaultValue={txn.incomeSource ?? "salary"}
+                options={[
+                  { value: "salary", label: "Salary" },
+                  { value: "refund", label: "Refund" },
+                  { value: "cashback", label: "Cashback" },
+                  { value: "other", label: "Other" },
+                ]}
+              />
             </Field>
           </>
         )}
 
         <Field label="Date" error={state.errors?.date}>
           <DateField today={today} defaultValue={txn.date} />
-        </Field>
-
-        <Field label="Note (optional)" error={state.errors?.note}>
-          <input
-            name="note"
-            maxLength={200}
-            defaultValue={txn.note ?? ""}
-            className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary"
-          />
         </Field>
 
         <div className="flex items-center justify-between pt-1">
