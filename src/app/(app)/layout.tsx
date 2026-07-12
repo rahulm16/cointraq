@@ -1,12 +1,12 @@
 import { Dock, Sidebar } from "@/components/nav";
-import { ToastProvider } from "@/components/toast";
+import { AppToaster } from "@/components/app-toaster";
 
 // Every authed page reads per-request data (DB, cookies); never prerender them.
 export const dynamic = "force-dynamic";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <ToastProvider>
+    <>
       {/* data-vaul-drawer-wrapper: vaul scales this back iOS-style behind sheets (§4) */}
       <div data-vaul-drawer-wrapper="" className="min-h-dvh bg-background">
         <Sidebar />
@@ -19,6 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         <Dock />
       </div>
-    </ToastProvider>
+      <AppToaster />
+    </>
   );
 }

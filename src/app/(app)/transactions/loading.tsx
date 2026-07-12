@@ -15,7 +15,7 @@ export default function Loading() {
       {[0, 1, 2].map((g) => (
         <div key={g} className="flex flex-col gap-2">
           <Skeleton className="h-4 w-28" />
-          <Skeleton className="h-[120px]" />
+          <Skeleton className="h-[120px] rounded-card" />
         </div>
       ))}
     </main>

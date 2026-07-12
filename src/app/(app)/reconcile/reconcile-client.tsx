@@ -10,8 +10,11 @@ import { SubmitButton } from "@/components/form";
 import { useToast } from "@/components/toast";
 import { formatINR } from "@/lib/money";
 import { INRFlow } from "@/components/inr-flow";
+import { CheckDraw } from "@/components/check-draw";
 import { formatDayLabel } from "@/lib/dates";
-import { Check, Trash2 } from "lucide-react";
+import { fadeTransition } from "@/lib/motion";
+import { motion } from "motion/react";
+import { Trash2 } from "lucide-react";
 
 interface Row {
   id: number;
@@ -135,10 +138,15 @@ export function ReconcileClient({
                   </div>
                 </div>
                 {touched && (
-                  <div className="mt-3">
+                  <motion.div
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={fadeTransition()}
+                    className="mt-3"
+                  >
                     {delta === 0 ? (
                       <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-income">
-                        <Check size={14} strokeWidth={2} />
+                        <CheckDraw size={14} />
                         Matches
                       </span>
                     ) : (
@@ -151,7 +159,7 @@ export function ReconcileClient({
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 )}
               </Card>
             );

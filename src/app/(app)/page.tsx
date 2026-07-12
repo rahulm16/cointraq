@@ -11,6 +11,7 @@ import { monthKey, todayIST } from "@/lib/dates";
 import { formatINR } from "@/lib/money";
 import { MonthSwitcher } from "@/components/month-switcher";
 import { MonthTransition } from "@/components/month-transition";
+import { Entrance, EntranceItem } from "@/components/entrance";
 import { INRFlow } from "@/components/inr-flow";
 import { Card, Eyebrow, EmptyState } from "@/components/ui";
 import { categoryClasses } from "@/lib/ui";
@@ -70,11 +71,12 @@ export default async function DashboardPage({
       </div>
 
       <MonthTransition month={month}>
+      <Entrance>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
         {/* Left/main column */}
         <div className="lg:col-span-2 flex flex-col gap-4">
           {/* Hero */}
-          <div
+          <EntranceItem
             className="rounded-[24px] p-[24px_22px] bg-primary shadow-[var(--shadow-hero)]"
           >
             <Eyebrow className="!text-primary-contrast/70">Spent in {monthLabel(month)}</Eyebrow>
@@ -89,10 +91,10 @@ export default async function DashboardPage({
                 </span>
               </div>
             )}
-          </div>
+          </EntranceItem>
 
           {/* Stat row — icon + eyebrow, value carries the meaning (§7) */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <EntranceItem className="grid grid-cols-3 gap-2.5">
             <Card lift className="!p-[12px_12px_14px]">
               <Eyebrow className="!text-[10px] flex items-center gap-1.5">
                 <Wallet size={12} strokeWidth={1.75} aria-hidden /> Cash
@@ -124,18 +126,20 @@ export default async function DashboardPage({
               </Eyebrow>
               <div className="text-[13px] text-text-primary mt-1.5 tnum">{d.accountsTracked} tracked</div>
             </Card>
-          </div>
+          </EntranceItem>
 
           {/* Daily bars */}
-          <Card>
-            <Eyebrow>Daily spend</Eyebrow>
-            <div className="mt-2">
-              <DailyBars data={d.dailyBars} />
-            </div>
-          </Card>
+          <EntranceItem>
+            <Card>
+              <Eyebrow>Daily spend</Eyebrow>
+              <div className="mt-2">
+                <DailyBars data={d.dailyBars} />
+              </div>
+            </Card>
+          </EntranceItem>
 
           {/* Category donut + method bars */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <EntranceItem className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Card>
               <Eyebrow>By category</Eyebrow>
               <div className="mt-3">
@@ -148,31 +152,38 @@ export default async function DashboardPage({
                 <MethodBars data={d.methodBars} />
               </div>
             </Card>
-          </div>
+          </EntranceItem>
 
           {/* Trend */}
-          <Card>
-            <Eyebrow>6-month trend</Eyebrow>
-            <div className="mt-2">
-              <TrendLine data={d.trend} />
-            </div>
-          </Card>
+          <EntranceItem>
+            <Card>
+              <Eyebrow>6-month trend</Eyebrow>
+              <div className="mt-2">
+                <TrendLine data={d.trend} />
+              </div>
+            </Card>
+          </EntranceItem>
         </div>
 
         {/* Right column: CC widgets + recent */}
         <div className="flex flex-col gap-4">
           {d.cards.map((c) => (
-            <CcWidget key={c.account.id} card={c} />
+            <EntranceItem key={c.account.id}>
+              <CcWidget card={c} />
+            </EntranceItem>
           ))}
-          <RecentList
-            recent={d.recent}
-            accounts={accounts}
-            methods={methods}
-            categories={categories}
-            today={today}
-          />
+          <EntranceItem>
+            <RecentList
+              recent={d.recent}
+              accounts={accounts}
+              methods={methods}
+              categories={categories}
+              today={today}
+            />
+          </EntranceItem>
         </div>
       </div>
+      </Entrance>
       </MonthTransition>
     </main>
   );

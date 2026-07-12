@@ -4,12 +4,13 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import { createTransaction } from "@/actions/transactions";
 import type { ActionResult } from "@/actions/shared";
-import { Field, SubmitButton } from "@/components/form";
+import { Field } from "@/components/form";
 import { useToast } from "@/components/toast";
 import { cn } from "@/lib/ui";
 import { formatINR } from "@/lib/money";
 import { motion } from "motion/react";
 import { SPRING } from "@/lib/motion";
+import { Check } from "lucide-react";
 import {
   AmountInput,
   MethodChips,
@@ -45,6 +46,7 @@ export function AddTransaction({
 }) {
   const [tab, setTab] = useState<Tab>("spend");
   const [state, formAction, pending] = useActionState(createTransaction, initial);
+  const [justSaved, setJustSaved] = useState(false);
   const { show } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -66,6 +68,9 @@ export function AddTransaction({
 
   useEffect(() => {
     if (state.ok) {
+      // Button morphs to a check for 600ms (§8).
+      setJustSaved(true);
+      const t = setTimeout(() => setJustSaved(false), 600);
       show("Saved", {
         tone: "success",
         action: {
@@ -89,6 +94,7 @@ export function AddTransaction({
       const note = f?.querySelector<HTMLInputElement>('input[name="note"]');
       if (amt) amt.value = "";
       if (note) note.value = "";
+      return () => clearTimeout(t);
     }
   }, [state, show]);
 
@@ -207,7 +213,19 @@ export function AddTransaction({
           </Field>
 
           <div className="flex justify-end pt-1">
-            <SubmitButton pending={pending}>Save</SubmitButton>
+            <button
+              type="submit"
+              disabled={pending || justSaved}
+              className="h-11 px-5 min-w-[112px] rounded-control bg-primary text-primary-contrast font-semibold text-[15px] disabled:opacity-100 pressable flex items-center justify-center gap-2"
+            >
+              {justSaved ? (
+                <motion.span initial={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={SPRING}>
+                  <Check size={18} strokeWidth={2.5} />
+                </motion.span>
+              ) : (
+                <span>{pending ? "Saving…" : "Save spend"}</span>
+              )}
+            </button>
           </div>
         </form>
       </div>

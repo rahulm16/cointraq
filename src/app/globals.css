@@ -15,6 +15,9 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Desktop-hover-only variant so touch devices never get sticky hover UI (§6). */
+@custom-variant can-hover (@media (hover: hover));
+
 :root,
 .dark {
   /* Dark theme (default) */

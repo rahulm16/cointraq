@@ -45,7 +45,7 @@ export function DailyBars({ data }: { data: { date: string; total: number }[] })
         <XAxis dataKey="date" hide />
         <YAxis hide />
         <Tooltip cursor={{ fill: "transparent" }} content={<TipDay />} />
-        <Bar dataKey="total" fill={PRIMARY} radius={[2, 2, 0, 0]} />
+        <Bar dataKey="total" fill={PRIMARY} radius={[4, 4, 0, 0]} isAnimationActive animationDuration={500} />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -70,7 +70,7 @@ export function CategoryDonut({
     <div className="flex items-center gap-4">
       <ResponsiveContainer width={140} height={140}>
         <PieChart>
-          <Pie data={data} dataKey="value" nameKey="label" innerRadius={42} outerRadius={64} stroke="none" paddingAngle={1}>
+          <Pie data={data} dataKey="value" nameKey="label" innerRadius={42} outerRadius={64} stroke="none" paddingAngle={1} isAnimationActive animationDuration={500}>
             {data.map((d, i) => (
               <Cell key={i} fill={colorFor(d.color)} />
             ))}
@@ -98,7 +98,7 @@ export function TrendLine({ data }: { data: { month: string; total: number }[] }
         <XAxis dataKey="month" tickFormatter={(m) => formatMonthLabel(m).slice(0, 3)} tick={{ fontSize: 10, fill: "var(--text-faint)" }} axisLine={false} tickLine={false} />
         <YAxis hide />
         <Tooltip content={<TipMonth />} />
-        <Line type="monotone" dataKey="total" stroke={PRIMARY} strokeWidth={2} dot={{ r: 3, fill: PRIMARY }} />
+        <Line type="monotone" dataKey="total" stroke={PRIMARY} strokeWidth={2} dot={{ r: 3, fill: PRIMARY }} isAnimationActive animationDuration={600} />
       </LineChart>
     </ResponsiveContainer>
   );

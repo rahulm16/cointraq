@@ -1,17 +1,32 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef } from "react";
+import { motion, useAnimationControls } from "motion/react";
 import { login, type LoginState } from "@/actions/auth";
 import { Lock } from "lucide-react";
 
 export function LoginForm() {
   const [state, action, pending] = useActionState<LoginState, FormData>(login, {});
+  const controls = useAnimationControls();
+  const errKey = useRef(0);
+
+  // Shake the field once on each new wrong-password error (§8): ±6px, 3 oscillations.
+  useEffect(() => {
+    if (state.error) {
+      errKey.current += 1;
+      controls.start({
+        x: [0, -6, 6, -6, 6, -3, 0],
+        transition: { duration: 0.4, ease: "easeInOut" },
+      });
+    }
+  }, [state, controls]);
 
   return (
     <form action={action} className="w-full mt-7 flex flex-col gap-3.5">
-      <div
+      <motion.div
+        animate={controls}
         className={`h-[46px] flex items-center gap-2.5 px-3.5 rounded-control bg-surface-raised border ${
-          state.error ? "border-alert" : "border-border"
+          state.error ? "border-alert" : "border-transparent"
         }`}
       >
         <Lock size={15} strokeWidth={1.5} className="text-text-faint" />
@@ -23,14 +38,14 @@ export function LoginForm() {
           placeholder="Password"
           className="flex-1 bg-transparent outline-none text-[16px] tnum tracking-widest text-text-primary placeholder:text-text-faint"
         />
-      </div>
+      </motion.div>
 
       {state.error && <p className="text-[12.5px] text-alert -mt-1">{state.error}</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="h-[46px] rounded-control bg-primary text-primary-contrast font-semibold text-[14.5px] disabled:opacity-60"
+        className="h-[46px] rounded-control bg-primary text-primary-contrast font-semibold text-[14.5px] disabled:opacity-60 pressable"
       >
         {pending ? "Unlocking…" : "Unlock"}
       </button>
