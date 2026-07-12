@@ -94,7 +94,7 @@ export function AddTransaction({
   return (
     <div className="flex flex-col gap-4">
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-inner bg-surface-raised border border-border overflow-x-auto">
+      <div className="flex gap-1 p-1 rounded-inner bg-surface-raised border border-transparent overflow-x-auto">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -179,7 +179,7 @@ export function AddTransaction({
                 <AccountSelect name="toAccountId" accounts={nonCredit} defaultId={nonCredit[0]?.id ?? null} />
               </Field>
               <Field label="Source" error={state.errors?.incomeSource}>
-                <select name="incomeSource" defaultValue="salary" className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary w-full">
+                <select name="incomeSource" defaultValue="salary" className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full">
                   <option value="salary">Salary</option>
                   <option value="refund">Refund</option>
                   <option value="cashback">Cashback</option>
@@ -198,7 +198,7 @@ export function AddTransaction({
               name="note"
               maxLength={200}
               placeholder={tab === "bill_pay" ? "credit card bill" : "dinner with Adi"}
-              className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary"
+              className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary"
             />
           </Field>
 
@@ -220,7 +220,7 @@ function BillPrefill({ remaining }: { remaining: number }) {
         const amt = form?.querySelector<HTMLInputElement>('input[name="amount"]');
         if (amt) amt.value = String(remaining);
       }}
-      className="self-start h-8 px-3 rounded-full bg-primary/12 border border-primary/40 text-primary text-[12.5px] font-medium"
+      className="self-start h-8 px-3 rounded-full bg-primary/15 text-primary text-[12.5px] font-medium pressable"
     >
       Full bill · {formatINR(remaining)}
     </button>

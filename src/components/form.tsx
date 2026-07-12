@@ -36,7 +36,8 @@ export function TextInput({
     <input
       {...props}
       className={cn(
-        "h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary",
+        // Borderless (§1): affordance from the raised surface step; focus ring in primary.
+        "h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary",
         "focus:border-primary placeholder:text-text-faint",
         numeric && "tnum",
         className,
@@ -50,7 +51,7 @@ export function Select({ className, children, ...props }: SelectHTMLAttributes<H
     <select
       {...props}
       className={cn(
-        "h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary",
+        "h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary",
         className,
       )}
     >
@@ -68,7 +69,7 @@ export function PrimaryButton({
     <button
       {...props}
       className={cn(
-        "h-11 px-4 rounded-control bg-primary text-primary-contrast font-semibold text-[15px] disabled:opacity-60",
+        "h-11 px-4 rounded-control bg-primary text-primary-contrast font-semibold text-[15px] disabled:opacity-60 pressable",
         className,
       )}
     >
@@ -86,7 +87,7 @@ export function GhostButton({
     <button
       {...props}
       className={cn(
-        "h-10 px-4 rounded-control bg-surface-raised border border-border text-[14px] font-medium text-text-primary disabled:opacity-60",
+        "h-10 px-4 rounded-control bg-surface-raised text-[14px] font-medium text-text-primary disabled:opacity-60 pressable",
         className,
       )}
     >

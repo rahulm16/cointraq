@@ -67,7 +67,7 @@ function NavCell({ item, active }: { item: NavItem; active: boolean }) {
 export function Sidebar() {
   const pathname = usePathname();
   return (
-    <aside className="hidden lg:flex fixed top-3 left-3 bottom-3 w-[224px] z-30 flex-col gap-5 bg-surface border border-border rounded-card p-4 shadow-[var(--shadow-card)]">
+    <aside className="hidden lg:flex fixed top-3 left-3 bottom-3 w-[224px] z-30 flex-col gap-5 bg-surface border border-transparent rounded-card p-4 shadow-[var(--shadow-card)]">
       <div className="flex items-center gap-2.5 px-1.5 py-0.5">
         <div className="w-7 h-7 rounded-lg bg-primary text-primary-contrast flex items-center justify-center font-semibold text-sm">
           {APP_NAME.charAt(0).toUpperCase()}

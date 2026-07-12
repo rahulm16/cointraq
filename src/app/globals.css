@@ -5,6 +5,12 @@
   Semantic tokens; the light theme swaps values, not designs (design note).
   Dark is the default per SPEC §13, authored to match the light system.
   next-themes sets class="dark" | "light" on <html>; we default-dark via :root.
+
+  Elevation (UI polish §1): borderless. Depth = layered surface steps.
+    dark  — each level is a LIGHTER surface step (shadows barely read on dark)
+    light — white surfaces + very soft large-radius shadows
+  Steps: background → surface (cards) → surface-raised (inputs/nested)
+         → surface-overlay (drawers, dock, tooltips, toasts).
 */
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -12,62 +18,66 @@
 :root,
 .dark {
   /* Dark theme (default) */
-  --background: #0F1626;
-  --surface: #161F33;
-  --surface-raised: #1E2942;
-  --border: #2A3654;
-  --text-primary: #EAF0FB;
-  --text-secondary: #9DAAC6;
-  --text-faint: #6B7896;
-  --primary: #3B77E8;
-  --primary-contrast: #FFFFFF;
-  --income: #2BB98A;
-  --alert: #F0554A;
-  --warning: #D99321;
+  --background: #0f1626;
+  --surface: #161f33;
+  --surface-raised: #1e2942;
+  --surface-overlay: #263352;
+  /* translucent overlay for blurred chrome (dock) */
+  --surface-glass: rgba(38, 51, 82, 0.78);
+  --border: #2a3654;
+  --text-primary: #eaf0fb;
+  --text-secondary: #9daac6;
+  --text-faint: #6b7896;
+  --primary: #3b77e8;
+  --primary-contrast: #ffffff;
+  --income: #2bb98a;
+  --alert: #f0554a;
+  --warning: #d99321;
 
   /* category palette */
-  --cat-blue: #3B77E8;
-  --cat-teal: #17B0A0;
-  --cat-violet: #8B7CF6;
-  --cat-amber: #D99321;
-  --cat-rose: #E86A8A;
-  --cat-green: #2BB98A;
+  --cat-blue: #3b77e8;
+  --cat-teal: #17b0a0;
+  --cat-violet: #8b7cf6;
+  --cat-amber: #d99321;
+  --cat-rose: #e86a8a;
+  --cat-green: #2bb98a;
 
-  --hero-amount: #FFFFFF;
+  --hero-amount: #ffffff;
 
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px rgba(0, 0, 0, 0.22);
+  --shadow-card-hover: 0 2px 4px rgba(0, 0, 0, 0.3), 0 14px 36px rgba(0, 0, 0, 0.32);
+  --shadow-overlay: 0 4px 12px rgba(0, 0, 0, 0.4), 0 24px 64px rgba(0, 0, 0, 0.45);
   --shadow-hero: 0 14px 36px rgba(29, 91, 216, 0.35);
-
-  --radius-card: 16px;
-  --radius-inner: 12px;
-  --radius-control: 8px;
-  --radius-hero: 18px;
 }
 
 .light {
-  --background: #EAEFF6;
-  --surface: #FFFFFF;
-  --surface-raised: #EDF2FA;
-  --border: #E2E9F4;
-  --text-primary: #16233F;
-  --text-secondary: #5D6E8C;
-  --text-faint: #8593AC;
-  --primary: #1D5BD8;
-  --primary-contrast: #FFFFFF;
-  --income: #0E9F6E;
-  --alert: #D92D20;
-  --warning: #B97509;
+  --background: #eaeff6;
+  --surface: #ffffff;
+  --surface-raised: #edf2fa;
+  --surface-overlay: #ffffff;
+  --surface-glass: rgba(255, 255, 255, 0.78);
+  --border: #e2e9f4;
+  --text-primary: #16233f;
+  --text-secondary: #5d6e8c;
+  --text-faint: #8593ac;
+  --primary: #1d5bd8;
+  --primary-contrast: #ffffff;
+  --income: #0e9f6e;
+  --alert: #d92d20;
+  --warning: #b97509;
 
-  --cat-blue: #1D5BD8;
-  --cat-teal: #0E9384;
-  --cat-violet: #6E56CF;
-  --cat-amber: #B97509;
-  --cat-rose: #D6467E;
-  --cat-green: #0E9F6E;
+  --cat-blue: #1d5bd8;
+  --cat-teal: #0e9384;
+  --cat-violet: #6e56cf;
+  --cat-amber: #b97509;
+  --cat-rose: #d6467e;
+  --cat-green: #0e9f6e;
 
-  --hero-amount: #16233F;
+  --hero-amount: #16233f;
 
-  --shadow-card: 0 1px 2px rgba(23, 48, 102, 0.04), 0 8px 24px rgba(23, 48, 102, 0.06);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 8px 24px rgb(0 0 0 / 0.06);
+  --shadow-card-hover: 0 2px 4px rgb(0 0 0 / 0.05), 0 14px 36px rgb(0 0 0 / 0.1);
+  --shadow-overlay: 0 4px 12px rgb(23 48 102 / 0.08), 0 24px 64px rgb(23 48 102 / 0.16);
   --shadow-hero: 0 14px 36px rgba(29, 91, 216, 0.3);
 }
 
@@ -75,6 +85,7 @@
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
   --color-border: var(--border);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
@@ -95,9 +106,10 @@
   --font-sans: var(--font-manrope), system-ui, sans-serif;
   --font-numeric: var(--font-space-grotesk), ui-monospace, monospace;
 
-  --radius-card: 16px;
-  --radius-inner: 12px;
-  --radius-control: 8px;
+  /* Radius scale (§1): cards 20px, inputs/buttons 14px, chips/badges full. */
+  --radius-card: 20px;
+  --radius-inner: 14px;
+  --radius-control: 14px;
 }
 
 * {
@@ -129,4 +141,68 @@ body {
 }
 .light {
   color-scheme: light;
+}
+
+/*
+  Sidebar rail offset (§2). Set pre-hydration by an inline script so the pinned
+  layout restores with zero flicker; toggled at runtime by the pin button.
+*/
+:root {
+  --sidebar-offset: 92px; /* 12 inset + 68 rail + 12 gap */
+}
+html[data-sidebar-pinned] {
+  --sidebar-offset: 280px; /* 12 + 256 + 12 */
+}
+
+/* Hover language (§6) — desktop pointers only; touch never gets sticky hovers. */
+@media (hover: hover) {
+  .hover-lift {
+    transition:
+      transform 150ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-card-hover);
+  }
+  .icon-btn {
+    transition:
+      background-color 150ms cubic-bezier(0.22, 1, 0.36, 1),
+      color 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .icon-btn:hover {
+    background-color: var(--surface-raised);
+  }
+  .icon-btn:hover svg {
+    transform: scale(1.06);
+  }
+  .icon-btn svg {
+    transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* Press feedback — applies on touch too. */
+.pressable {
+  transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pressable:active {
+  transform: scale(0.98);
+}
+
+/* Visible focus for keyboard users on icon-only controls. */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Reduced motion: kill CSS transitions/animations app-wide. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

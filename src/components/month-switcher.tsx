@@ -26,7 +26,7 @@ export function MonthSwitcher({ month, maxMonth }: { month: string; maxMonth: st
       <button
         onClick={() => go(shiftMonth(month, -1))}
         aria-label="Previous month"
-        className="w-8 h-8 rounded-[10px] bg-surface border border-border text-text-secondary flex items-center justify-center"
+        className="w-9 h-9 rounded-full bg-surface shadow-[var(--shadow-card)] text-text-secondary icon-btn pressable flex items-center justify-center"
       >
         <ChevronLeft size={16} strokeWidth={1.75} />
       </button>
@@ -35,7 +35,7 @@ export function MonthSwitcher({ month, maxMonth }: { month: string; maxMonth: st
         onClick={() => !atMax && go(shiftMonth(month, 1))}
         aria-label="Next month"
         disabled={atMax}
-        className="w-8 h-8 rounded-[10px] bg-surface border border-border text-text-secondary flex items-center justify-center disabled:opacity-40"
+        className="w-9 h-9 rounded-full bg-surface shadow-[var(--shadow-card)] text-text-secondary icon-btn pressable flex items-center justify-center disabled:opacity-40"
       >
         <ChevronRight size={16} strokeWidth={1.75} />
       </button>

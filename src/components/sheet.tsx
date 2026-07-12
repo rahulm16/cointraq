@@ -37,7 +37,7 @@ export function Sheet({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full lg:max-w-[520px] max-h-[92dvh] overflow-y-auto bg-surface border-t lg:border border-border rounded-t-[20px] lg:rounded-card shadow-[var(--shadow-card)]"
+        className="relative w-full lg:max-w-[520px] max-h-[92dvh] overflow-y-auto bg-surface border-t lg:border border-transparent rounded-t-[20px] lg:rounded-card shadow-[var(--shadow-card)]"
       >
         <div className="sticky top-0 bg-surface flex items-center justify-between px-5 py-4 border-b border-border">
           <h2 className="text-[17px] font-semibold text-text-primary">{title}</h2>
@@ -76,11 +76,11 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
       <div className="absolute inset-0 bg-black/50" onClick={onCancel} aria-hidden />
-      <div role="alertdialog" aria-modal="true" className="relative w-full max-w-[360px] bg-surface border border-border rounded-card p-5 shadow-[var(--shadow-card)]">
+      <div role="alertdialog" aria-modal="true" className="relative w-full max-w-[360px] bg-surface border border-transparent rounded-card p-5 shadow-[var(--shadow-card)]">
         <h3 className="text-[16px] font-semibold text-text-primary">{title}</h3>
         {body && <p className="mt-1.5 text-[13px] text-text-secondary">{body}</p>}
         <div className="mt-5 flex gap-2 justify-end">
-          <button onClick={onCancel} className="h-10 px-4 rounded-control bg-surface-raised border border-border text-[14px] font-medium text-text-primary">
+          <button onClick={onCancel} className="h-10 px-4 rounded-control bg-surface-raised border border-transparent text-[14px] font-medium text-text-primary">
             Cancel
           </button>
           <button

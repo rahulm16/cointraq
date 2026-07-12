@@ -13,7 +13,7 @@ import { parseDate, toDateStr } from "@/lib/dates";
 
 export function AmountInput({ defaultValue }: { defaultValue?: number }) {
   return (
-    <div className="flex items-center gap-2 h-14 px-4 rounded-inner bg-surface-raised border border-border focus-within:border-primary">
+    <div className="flex items-center gap-2 h-14 px-4 rounded-inner bg-surface-raised border border-transparent focus-within:border-primary">
       <span className="tnum text-2xl text-text-faint">₹</span>
       <input
         name="amount"
@@ -58,10 +58,11 @@ export function MethodChips({
                 onSelect?.(m);
               }}
               className={cn(
-                "h-9 inline-flex items-center gap-2 px-3.5 rounded-control border text-[13px] font-medium",
+                // Chips are full-radius tinted pills (§1); press-scale on select (§8).
+                "h-9 inline-flex items-center gap-2 px-3.5 rounded-full text-[13px] font-medium pressable",
                 active
-                  ? "bg-primary/12 border-primary/40 text-primary font-semibold"
-                  : "bg-surface border-border text-text-secondary",
+                  ? "bg-primary/15 text-primary font-semibold"
+                  : "bg-surface-raised text-text-secondary",
               )}
             >
               <Avatar icon={m.icon} name={m.name} size={20} />
@@ -79,7 +80,7 @@ export function MethodChips({
 export function CcHint({ billingDay, date }: { billingDay: number; date: string }) {
   const cycle = cycleContaining(date, billingDay);
   return (
-    <div className="text-[12px] text-text-secondary bg-surface-raised border border-border rounded-control px-3 py-2">
+    <div className="text-[12px] text-text-secondary bg-surface-raised border border-transparent rounded-control px-3 py-2">
       Goes to the credit-card ledger · cycle{" "}
       <span className="tnum">
         {formatDayShort(cycle.start)} – {formatDayShort(cycle.end)}
@@ -99,14 +100,14 @@ export function DateField({ today, defaultValue }: { today: string; defaultValue
         value={date}
         max={today}
         onChange={(e) => setDate(e.target.value)}
-        className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] tnum text-text-primary focus:border-primary"
+        className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] tnum text-text-primary focus:border-primary"
       />
       <button
         type="button"
         onClick={() => setDate(today)}
         className={cn(
-          "h-9 px-3 rounded-control border text-[12.5px] font-medium",
-          date === today ? "bg-primary/12 border-primary/40 text-primary" : "bg-surface border-border text-text-secondary",
+          "h-9 px-3 rounded-full text-[12.5px] font-medium pressable",
+          date === today ? "bg-primary/15 text-primary" : "bg-surface-raised text-text-secondary",
         )}
       >
         Today
@@ -115,8 +116,8 @@ export function DateField({ today, defaultValue }: { today: string; defaultValue
         type="button"
         onClick={() => setDate(yesterday)}
         className={cn(
-          "h-9 px-3 rounded-control border text-[12.5px] font-medium",
-          date === yesterday ? "bg-primary/12 border-primary/40 text-primary" : "bg-surface border-border text-text-secondary",
+          "h-9 px-3 rounded-full text-[12.5px] font-medium pressable",
+          date === yesterday ? "bg-primary/15 text-primary" : "bg-surface-raised text-text-secondary",
         )}
       >
         Yesterday
@@ -168,8 +169,8 @@ export function CategoryPicker({
           type="button"
           onClick={() => setSelected(null)}
           className={cn(
-            "h-8 px-3 rounded-full text-[12.5px] font-medium border",
-            selected === null ? "border-text-primary text-text-primary" : "border-border text-text-faint",
+            "h-8 px-3 rounded-full text-[12.5px] font-medium pressable",
+            selected === null ? "bg-surface-raised text-text-primary" : "text-text-faint",
           )}
         >
           None
@@ -197,7 +198,7 @@ export function CategoryPicker({
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="h-8 px-3 rounded-full text-[12.5px] font-medium border border-dashed border-border text-primary"
+            className="h-8 px-3 rounded-full text-[12.5px] font-medium bg-primary/10 text-primary pressable"
           >
             + New
           </button>
@@ -205,12 +206,12 @@ export function CategoryPicker({
       </div>
 
       {adding && (
-        <div className="flex flex-col gap-2 p-3 rounded-inner bg-surface-raised border border-border">
+        <div className="flex flex-col gap-2 p-3 rounded-inner bg-surface-raised border border-transparent">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Category name"
-            className="h-9 px-3 rounded-control bg-surface border border-border outline-none text-[14px] focus:border-primary"
+            className="h-9 px-3 rounded-control bg-surface border border-transparent outline-none text-[14px] focus:border-primary"
           />
           <div className="flex flex-wrap gap-2">
             {CATEGORY_COLORS.map((c) => (
@@ -259,7 +260,7 @@ export function AccountSelect({
     <select
       name={name}
       defaultValue={defaultId ?? ""}
-      className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary w-full"
+      className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full"
     >
       {placeholder && <option value="">{placeholder}</option>}
       {accounts.map((a) => (

@@ -48,7 +48,7 @@ export function IconUpload({
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
-            className="h-8 px-3 rounded-control bg-surface-raised border border-border text-[13px] font-medium text-text-primary disabled:opacity-60"
+            className="h-8 px-3 rounded-control bg-surface-raised border border-transparent text-[13px] font-medium text-text-primary disabled:opacity-60"
           >
             {busy ? "Processing…" : icon ? "Replace" : "Upload icon"}
           </button>

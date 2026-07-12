@@ -72,7 +72,7 @@ export default async function DashboardPage({
         <div className="lg:col-span-2 flex flex-col gap-4">
           {/* Hero */}
           <div
-            className="rounded-[18px] p-[24px_22px] bg-primary shadow-[var(--shadow-hero)]"
+            className="rounded-[24px] p-[24px_22px] bg-primary shadow-[var(--shadow-hero)]"
           >
             <Eyebrow className="!text-primary-contrast/70">Spent in {monthLabel(month)}</Eyebrow>
             <div className="tnum text-[46px] leading-[1.15] mt-2" style={{ color: "var(--hero-amount)" }}>

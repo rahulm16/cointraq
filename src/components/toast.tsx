@@ -38,7 +38,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className="pointer-events-auto max-w-sm w-full flex items-center gap-3 px-4 py-3 rounded-inner bg-surface border border-border shadow-[var(--shadow-card)]"
+            className="pointer-events-auto max-w-sm w-full flex items-center gap-3 px-4 py-3 rounded-inner bg-surface border border-transparent shadow-[var(--shadow-card)]"
           >
             <span
               className={`w-1.5 h-1.5 rounded-full flex-none ${

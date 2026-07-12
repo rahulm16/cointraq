@@ -28,7 +28,7 @@ function colorFor(color: CategoryColor | "ccbill" | "uncategorized"): string {
 function ChartTip({ active, payload, label }: { active?: boolean; payload?: { value: number; name?: string }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-control bg-surface border border-border px-2.5 py-1.5 shadow-[var(--shadow-card)]">
+    <div className="rounded-control bg-surface-overlay px-3 py-2 shadow-[var(--shadow-overlay)]">
       {label && <div className="text-[11px] text-text-faint">{label}</div>}
       <div className="text-[12.5px] tnum font-medium text-text-primary">
         {payload[0].name ? `${payload[0].name}: ` : ""}
@@ -53,7 +53,7 @@ export function DailyBars({ data }: { data: { date: string; total: number }[] })
 function TipDay({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-control bg-surface border border-border px-2.5 py-1.5 shadow-[var(--shadow-card)]">
+    <div className="rounded-control bg-surface-overlay px-3 py-2 shadow-[var(--shadow-overlay)]">
       <div className="text-[11px] text-text-faint tnum">{label ? formatDayShort(label) : ""}</div>
       <div className="text-[12.5px] tnum font-medium text-text-primary">{formatINR(payload[0].value)}</div>
     </div>
@@ -106,7 +106,7 @@ export function TrendLine({ data }: { data: { month: string; total: number }[] }
 function TipMonth({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-control bg-surface border border-border px-2.5 py-1.5 shadow-[var(--shadow-card)]">
+    <div className="rounded-control bg-surface-overlay px-3 py-2 shadow-[var(--shadow-overlay)]">
       <div className="text-[11px] text-text-faint">{label ? formatMonthLabel(label) : ""}</div>
       <div className="text-[12.5px] tnum font-medium text-text-primary">{formatINR(payload[0].value)}</div>
     </div>

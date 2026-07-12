@@ -69,7 +69,7 @@ export function TransactionsView({
     <div className="flex flex-col gap-4">
       {/* Search */}
       <form onSubmit={submitSearch} className="flex gap-2">
-        <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-control bg-surface-raised border border-border focus-within:border-primary">
+        <div className="flex-1 flex items-center gap-2 h-10 px-3 rounded-control bg-surface-raised border border-transparent focus-within:border-primary">
           <Search size={16} strokeWidth={1.5} className="text-text-faint" />
           <input
             value={searchText}
@@ -114,7 +114,7 @@ export function TransactionsView({
       </div>
 
       {/* Summary line */}
-      <div className="flex items-center justify-between px-3 py-2.5 rounded-control bg-surface-raised border border-border">
+      <div className="flex items-center justify-between px-3 py-2.5 rounded-control bg-surface-raised border border-transparent">
         <span className="text-[12.5px] tnum text-text-secondary">
           {summary.count} transaction{summary.count === 1 ? "" : "s"}
         </span>
@@ -184,7 +184,7 @@ function FilterSelect({
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-9 px-2.5 rounded-control bg-surface border border-border text-[12.5px] text-text-secondary outline-none focus:border-primary"
+      className="h-9 px-2.5 rounded-control bg-surface border border-transparent text-[12.5px] text-text-secondary outline-none focus:border-primary"
     >
       {children}
     </select>

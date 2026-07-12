@@ -2,12 +2,22 @@ import { cn, avatarColor, withAlpha } from "@/lib/ui";
 import type { ReactNode } from "react";
 import { Plus } from "lucide-react";
 
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
+export function Card({
+  className,
+  children,
+  lift = false,
+}: {
+  className?: string;
+  children: ReactNode;
+  /** Desktop hover: -2px lift + deeper shadow (§6). */
+  lift?: boolean;
+}) {
   return (
     <div
       className={cn(
-        "bg-surface border border-border rounded-card p-[18px_20px]",
-        "shadow-[var(--shadow-card)]",
+        // Borderless elevation (§1): depth from surface steps + soft shadow.
+        "bg-surface rounded-card p-[18px_20px] shadow-[var(--shadow-card)]",
+        lift && "hover-lift",
         className,
       )}
     >
@@ -107,7 +117,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center gap-3 py-16 px-6">
-      <div className="w-12 h-12 rounded-full bg-surface-raised border border-border flex items-center justify-center text-text-faint">
+      <div className="w-12 h-12 rounded-full bg-surface-raised border border-transparent flex items-center justify-center text-text-faint">
         <Plus size={22} strokeWidth={1.5} />
       </div>
       <div className="text-[15px] font-semibold text-text-primary">{title}</div>

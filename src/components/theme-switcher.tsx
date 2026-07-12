@@ -18,7 +18,7 @@ export function ThemeSwitcher() {
   const current = mounted ? theme ?? "dark" : "dark";
 
   return (
-    <div className="inline-flex p-1 rounded-control bg-surface-raised border border-border gap-1">
+    <div className="inline-flex p-1 rounded-control bg-surface-raised border border-transparent gap-1">
       {options.map((o) => (
         <button
           key={o.value}

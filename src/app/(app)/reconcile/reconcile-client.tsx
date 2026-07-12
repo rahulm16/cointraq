@@ -81,11 +81,11 @@ export function ReconcileClient({
             value={asOf}
             max={today}
             onChange={(e) => router.push(`${pathname}?d=${e.target.value}`)}
-            className="h-9 px-3 rounded-control bg-surface-raised border border-border outline-none text-[14px] tnum text-text-primary focus:border-primary"
+            className="h-9 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[14px] tnum text-text-primary focus:border-primary"
           />
         </div>
 
-        <div className="flex items-center justify-between px-4 py-3 rounded-inner bg-surface-raised border border-border">
+        <div className="flex items-center justify-between px-4 py-3 rounded-inner bg-surface-raised border border-transparent">
           <span className="text-[12.5px] tnum text-text-secondary">
             {summary.entered} of {rows.length} entered
             {summary.entered > 0 && summary.unaccounted !== 0 && (
@@ -116,7 +116,7 @@ export function ReconcileClient({
                   </div>
                   <div className="flex-1 flex flex-col gap-1">
                     <Eyebrow>Actual</Eyebrow>
-                    <div className="h-[42px] flex items-center gap-1.5 px-3 rounded-control bg-surface-raised border border-border focus-within:border-primary">
+                    <div className="h-[42px] flex items-center gap-1.5 px-3 rounded-control bg-surface-raised border border-transparent focus-within:border-primary">
                       <span className="tnum text-[15px] text-text-faint">₹</span>
                       <input
                         name={`actual_${r.id}`}

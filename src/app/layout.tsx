@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Manrope, Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MotionProvider } from "@/components/motion-provider";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 
 const manrope = Manrope({
@@ -29,12 +30,16 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// Restores the pinned-sidebar layout before first paint (no flicker). §2
+const sidebarRestoreScript = `try{if(localStorage.getItem("cointraq-sidebar-pinned")==="1")document.documentElement.setAttribute("data-sidebar-pinned","")}catch(e){}`;
+
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${manrope.variable} ${spaceGrotesk.variable}`}>
       <body>
+        <script dangerouslySetInnerHTML={{ __html: sidebarRestoreScript }} />
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          {children}
+          <MotionProvider>{children}</MotionProvider>
         </ThemeProvider>
       </body>
     </html>

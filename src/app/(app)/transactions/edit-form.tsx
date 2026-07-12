@@ -121,7 +121,7 @@ export function EditForm({
               <AccountSelect name="toAccountId" accounts={nonCredit} defaultId={txn.toAccountId} />
             </Field>
             <Field label="Source" error={state.errors?.incomeSource}>
-              <select name="incomeSource" defaultValue={txn.incomeSource ?? "salary"} className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary w-full">
+              <select name="incomeSource" defaultValue={txn.incomeSource ?? "salary"} className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary w-full">
                 <option value="salary">Salary</option>
                 <option value="refund">Refund</option>
                 <option value="cashback">Cashback</option>
@@ -140,7 +140,7 @@ export function EditForm({
             name="note"
             maxLength={200}
             defaultValue={txn.note ?? ""}
-            className="h-10 px-3 rounded-control bg-surface-raised border border-border outline-none text-[15px] text-text-primary focus:border-primary"
+            className="h-10 px-3 rounded-control bg-surface-raised border border-transparent outline-none text-[15px] text-text-primary focus:border-primary"
           />
         </Field>
 
