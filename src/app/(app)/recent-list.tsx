@@ -1,0 +1,64 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import type { Account, Category, PaymentMethod, Transaction } from "@/lib/types";
+import { Card } from "@/components/ui";
+import { Sheet } from "@/components/sheet";
+import { TxnRow } from "@/components/txn-row";
+import { EditForm } from "./transactions/edit-form";
+
+export function RecentList({
+  recent,
+  accounts,
+  methods,
+  categories,
+  today,
+}: {
+  recent: Transaction[];
+  accounts: Account[];
+  methods: PaymentMethod[];
+  categories: Category[];
+  today: string;
+}) {
+  const [editing, setEditing] = useState<Transaction | null>(null);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-text-faint">Recent</h2>
+        <Link href="/transactions" className="text-[13px] font-medium text-primary">
+          View all
+        </Link>
+      </div>
+      <Card className="!p-0">
+        <div className="px-4 divide-y divide-border">
+          {recent.map((t) => (
+            <TxnRow
+              key={t.id}
+              txn={t}
+              accounts={accounts}
+              methods={methods}
+              categories={categories}
+              onClick={() => setEditing(t)}
+            />
+          ))}
+          {recent.length === 0 && <div className="text-[13px] text-text-faint py-4">No transactions yet.</div>}
+        </div>
+      </Card>
+
+      <Sheet open={!!editing} onClose={() => setEditing(null)} title="Edit transaction">
+        {editing && (
+          <EditForm
+            txn={editing}
+            accounts={accounts}
+            methods={methods}
+            categories={categories}
+            today={today}
+            onDone={() => setEditing(null)}
+          />
+        )}
+      </Sheet>
+    </div>
+  );
+}

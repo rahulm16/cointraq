@@ -1,26 +1,132 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/*
+  Design tokens ported from the Khaata design style tile (1c).
+  Semantic tokens; the light theme swaps values, not designs (design note).
+  Dark is the default per SPEC §13, authored to match the light system.
+  next-themes sets class="dark" | "light" on <html>; we default-dark via :root.
+*/
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+.dark {
+  /* Dark theme (default) */
+  --background: #0F1626;
+  --surface: #161F33;
+  --surface-raised: #1E2942;
+  --border: #2A3654;
+  --text-primary: #EAF0FB;
+  --text-secondary: #9DAAC6;
+  --text-faint: #6B7896;
+  --primary: #3B77E8;
+  --primary-contrast: #FFFFFF;
+  --income: #2BB98A;
+  --alert: #F0554A;
+  --warning: #D99321;
+
+  /* category palette */
+  --cat-blue: #3B77E8;
+  --cat-teal: #17B0A0;
+  --cat-violet: #8B7CF6;
+  --cat-amber: #D99321;
+  --cat-rose: #E86A8A;
+  --cat-green: #2BB98A;
+
+  --hero-amount: #FFFFFF;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow-hero: 0 14px 36px rgba(29, 91, 216, 0.35);
+
+  --radius-card: 16px;
+  --radius-inner: 12px;
+  --radius-control: 8px;
+  --radius-hero: 18px;
+}
+
+.light {
+  --background: #EAEFF6;
+  --surface: #FFFFFF;
+  --surface-raised: #EDF2FA;
+  --border: #E2E9F4;
+  --text-primary: #16233F;
+  --text-secondary: #5D6E8C;
+  --text-faint: #8593AC;
+  --primary: #1D5BD8;
+  --primary-contrast: #FFFFFF;
+  --income: #0E9F6E;
+  --alert: #D92D20;
+  --warning: #B97509;
+
+  --cat-blue: #1D5BD8;
+  --cat-teal: #0E9384;
+  --cat-violet: #6E56CF;
+  --cat-amber: #B97509;
+  --cat-rose: #D6467E;
+  --cat-green: #0E9F6E;
+
+  --hero-amount: #16233F;
+
+  --shadow-card: 0 1px 2px rgba(23, 48, 102, 0.04), 0 8px 24px rgba(23, 48, 102, 0.06);
+  --shadow-hero: 0 14px 36px rgba(29, 91, 216, 0.3);
 }
 
 @theme inline {
   --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-faint: var(--text-faint);
+  --color-primary: var(--primary);
+  --color-primary-contrast: var(--primary-contrast);
+  --color-income: var(--income);
+  --color-alert: var(--alert);
+  --color-warning: var(--warning);
+
+  --color-cat-blue: var(--cat-blue);
+  --color-cat-teal: var(--cat-teal);
+  --color-cat-violet: var(--cat-violet);
+  --color-cat-amber: var(--cat-amber);
+  --color-cat-rose: var(--cat-rose);
+  --color-cat-green: var(--cat-green);
+
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-numeric: var(--font-space-grotesk), ui-monospace, monospace;
+
+  --radius-card: 16px;
+  --radius-inner: 12px;
+  --radius-control: 8px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html,
+body {
+  height: 100%;
 }
 
 body {
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--text-primary);
+  font-family: var(--font-manrope), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numbers, dates and amounts use Space Grotesk with tabular figures. */
+.tnum {
+  font-family: var(--font-space-grotesk), ui-monospace, monospace;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Prevent theme flash: color-scheme hint for form controls & scrollbars. */
+:root,
+.dark {
+  color-scheme: dark;
+}
+.light {
+  color-scheme: light;
 }
