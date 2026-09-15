@@ -10,14 +10,16 @@ import { AppDrawer } from "@/components/drawer";
 import { ConfirmDialog } from "@/components/sheet";
 import { TxnRow } from "@/components/txn-row";
 import { EditForm } from "./edit-form";
-import { deleteTransaction } from "@/actions/transactions";
+import { deleteTransactionWithUndo, restoreTransaction } from "@/actions/transactions";
+import { useToast } from "@/components/toast";
 import { INRFlow } from "@/components/inr-flow";
 import { formatDayLabel } from "@/lib/dates";
 import { DUR, fadeTransition } from "@/lib/motion";
 import { TYPE_LABEL } from "@/lib/txn-display";
 import { cn } from "@/lib/ui";
 import type { TransactionType } from "@/lib/types";
-import { Search, Filter, Wallet, Landmark, Tag, ChevronDown, type LucideIcon } from "lucide-react";
+import { Search, Filter, Wallet, Landmark, Tag, ChevronDown, Check, type LucideIcon } from "lucide-react";
+import { BulkBar } from "./bulk-bar";
 import { SelectMenu, type SelectOption } from "@/components/select-menu";
 
 const TYPES: TransactionType[] = ["expense", "cc_spend", "bill_pay", "transfer", "withdrawal", "income"];
@@ -56,6 +58,19 @@ export function TransactionsView({
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [confirming, setConfirming] = useState<Transaction | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const { show } = useToast();
+
+  // Bulk selection. Entering select mode swaps row taps from "edit" to "select".
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<number[]>([]);
+
+  const toggleSelect = (id: number) =>
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelected([]);
+  };
   const [searchText, setSearchText] = useState(filters.search ?? "");
 
   function setParam(key: string, value: string | undefined) {
@@ -156,12 +171,22 @@ export function TransactionsView({
         <span className="text-[12.5px] tnum font-medium text-text-primary">
           {summary.count} transaction{summary.count === 1 ? "" : "s"}
         </span>
-        <span className="text-[12.5px] font-medium text-text-primary">
-          Spends{" "}
-          <span className="tnum font-semibold">
-            <INRFlow value={summary.total} />
+        <div className="flex items-center gap-3">
+          <span className="text-[12.5px] font-medium text-text-primary">
+            Spends{" "}
+            <span className="tnum font-semibold">
+              <INRFlow value={summary.total} />
+            </span>
           </span>
-        </span>
+          {transactions.length > 0 && (
+            <button
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              className="text-[12px] font-semibold text-text-faint hover:text-text-primary"
+            >
+              {selectMode ? "Done" : "Select"}
+            </button>
+          )}
+        </div>
       </div>
 
       {transactions.length === 0 ? (
@@ -183,15 +208,39 @@ export function TransactionsView({
                       transition={fadeTransition(DUR.base)}
                       className="border-b border-border last:border-b-0"
                     >
-                        <TxnRow
-                          txn={t}
-                          accounts={accounts}
-                          methods={methods}
-                          categories={categories}
-                          onClick={() => setEditing(t)}
-                          onDelete={() => setConfirming(t)}
-                          className="border-b-0"
-                        />
+                      <div className="flex items-center">
+                        {selectMode && (
+                          <button
+                            onClick={() => toggleSelect(t.id)}
+                            role="checkbox"
+                            aria-checked={selected.includes(t.id)}
+                            aria-label={`Select ${t.title}`}
+                            className="flex-none pl-3 pr-1 self-stretch flex items-center"
+                          >
+                            <span
+                              className={cn(
+                                "size-[18px] rounded-md flex items-center justify-center",
+                                selected.includes(t.id)
+                                  ? "bg-primary text-primary-contrast"
+                                  : "bg-surface-raised",
+                              )}
+                            >
+                              {selected.includes(t.id) && <Check size={12} strokeWidth={3} />}
+                            </span>
+                          </button>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <TxnRow
+                            txn={t}
+                            accounts={accounts}
+                            methods={methods}
+                            categories={categories}
+                            onClick={() => (selectMode ? toggleSelect(t.id) : setEditing(t))}
+                            onDelete={() => setConfirming(t)}
+                            className="border-b-0"
+                          />
+                        </div>
+                      </div>
                     </motion.div>
                   ))}
                 </AnimatePresence>
@@ -223,12 +272,29 @@ export function TransactionsView({
         onConfirm={async () => {
           if (!confirming) return;
           setDeleting(true);
-          await deleteTransaction(confirming.id);
+          const res = await deleteTransactionWithUndo(confirming.id);
           setDeleting(false);
           setConfirming(null);
+
+          // Undo re-inserts the captured row; the toast is the whole undo window.
+          if (res.ok && res.restore) {
+            const snapshot = res.restore;
+            show("Deleted", {
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  void restoreTransaction(snapshot).then((r) => {
+                    if (!r.ok) show("Could not undo", { tone: "error" });
+                  });
+                },
+              },
+            });
+          }
         }}
         onCancel={() => setConfirming(null)}
       />
+
+      <BulkBar selected={selected} categories={categories} onClear={exitSelect} />
     </div>
   );
 }

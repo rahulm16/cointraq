@@ -52,6 +52,50 @@ export const categoryInputSchema = z.object({
   color: categoryColorSchema,
 });
 
+/* ---- Budgets ---- */
+
+export const monthKeySchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Invalid month");
+
+export const budgetInputSchema = z.object({
+  /** null = the overall month cap. */
+  categoryId: z.number().int().positive().nullable(),
+  month: monthKeySchema,
+  /** 0 clears the budget; anything above must be a sane rupee amount. */
+  amount: z.number().int().min(0).max(AMOUNT_MAX),
+});
+
+/* ---- Recurring templates ---- */
+
+export const recurrenceSchema = z.enum(["monthly", "weekly", "yearly"]);
+
+export const recurringInputSchema = z
+  .object({
+    title: z.string().trim().min(1, "Title required").max(TITLE_MAX),
+    type: z.enum(["expense", "bill_pay", "transfer", "withdrawal", "income"]),
+    amount: amountSchema,
+    categoryId: z.number().int().positive().nullable().optional(),
+    methodId: z.number().int().positive().nullable().optional(),
+    fromAccountId: z.number().int().positive().nullable().optional(),
+    toAccountId: z.number().int().positive().nullable().optional(),
+    incomeSource: incomeSourceSchema.nullable().optional(),
+    recurrence: recurrenceSchema,
+    dayOfMonth: z.number().int().min(1).max(31).nullable().optional(),
+    dayOfWeek: z.number().int().min(0).max(6).nullable().optional(),
+    monthOfYear: z.number().int().min(1).max(12).nullable().optional(),
+  })
+  .superRefine((v, ctx) => {
+    // Each recurrence kind needs its own scheduling field.
+    if (v.recurrence === "weekly" && v.dayOfWeek == null) {
+      ctx.addIssue({ code: "custom", path: ["dayOfWeek"], message: "Pick a weekday" });
+    }
+    if (v.recurrence !== "weekly" && v.dayOfMonth == null) {
+      ctx.addIssue({ code: "custom", path: ["dayOfMonth"], message: "Pick a day" });
+    }
+    if (v.recurrence === "yearly" && v.monthOfYear == null) {
+      ctx.addIssue({ code: "custom", path: ["monthOfYear"], message: "Pick a month" });
+    }
+  });
+
 /** Flatten a ZodError into { field: message } for inline form rendering. */
 export function fieldErrors(err: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {};

@@ -15,6 +15,13 @@
       "when": 1783860000000,
       "tag": "0001_title_replaces_note",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783870000000,
+      "tag": "0002_budgets_and_recurring",
+      "breakpoints": true
     }
   ]
 }

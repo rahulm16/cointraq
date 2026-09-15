@@ -1,4 +1,11 @@
-import { getAccounts, getMethods, getCategories, getTxnEffects, getTitlesByKind } from "@/db/queries";
+import {
+  getAccounts,
+  getMethods,
+  getCategories,
+  getTxnEffects,
+  getTitlesByKind,
+  getTitleMemory,
+} from "@/db/queries";
 import { AddTransaction } from "./add-transaction";
 import { AddDrawerShell } from "./add-drawer-shell";
 import { APP_NAME } from "@/lib/constants";
@@ -9,12 +16,13 @@ import type { TxnEffect } from "@/lib/types";
 export const metadata = { title: `${APP_NAME} · Add` };
 
 export default async function AddPage() {
-  const [accounts, methods, categories, effects, titlesByKind] = await Promise.all([
+  const [accounts, methods, categories, effects, titlesByKind, titleMemory] = await Promise.all([
     getAccounts(false),
     getMethods(false),
     getCategories(false),
     getTxnEffects(),
     getTitlesByKind(),
+    getTitleMemory(),
   ]);
 
   const today = todayIST();
@@ -41,6 +49,7 @@ export default async function AddPage() {
           today={today}
           lastStatements={lastStatements}
           titlesByKind={titlesByKind}
+          titleMemory={titleMemory.byTitle}
         />
       </AddDrawerShell>
     </main>

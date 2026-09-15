@@ -103,3 +103,59 @@ export const snapshots = pgTable("snapshots", {
   expectedBalance: integer("expected_balance").notNull(), // frozen at save time
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Monthly spending caps. `categoryId = null` is the overall month cap; one row
+ * per (category, month). `month` is a "yyyy-MM" key — budgets are a calendar-month
+ * concept even though the dashboard can show arbitrary ranges.
+ */
+export const budgets = pgTable(
+  "budgets",
+  {
+    id: serial("id").primaryKey(),
+    categoryId: integer("category_id").references(() => categories.id),
+    month: text("month").notNull(), // "yyyy-MM"
+    amount: integer("amount").notNull(), // positive whole rupees
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // One budget per category per month; the overall cap (null category) is
+    // handled by a second partial index since NULLs don't collide in Postgres.
+    uniqueIndex("budgets_category_month").on(t.categoryId, t.month),
+    uniqueIndex("budgets_overall_month")
+      .on(t.month)
+      .where(sql`${t.categoryId} is null`),
+  ],
+);
+
+export const recurrenceEnum = pgEnum("recurrence", ["monthly", "weekly", "yearly"]);
+
+/**
+ * Saved templates for repeating spends (rent, EMIs, subscriptions). These never
+ * auto-log — the app surfaces what is due and the user logs it in one tap.
+ */
+export const recurringTemplates = pgTable("recurring_templates", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  type: txnTypeEnum("type").notNull(),
+  amount: integer("amount").notNull(),
+  categoryId: integer("category_id").references(() => categories.id),
+  methodId: integer("method_id").references(() => paymentMethods.id),
+  fromAccountId: integer("from_account_id").references(() => accounts.id),
+  toAccountId: integer("to_account_id").references(() => accounts.id),
+  incomeSource: incomeSourceEnum("income_source"),
+  recurrence: recurrenceEnum("recurrence").notNull().default("monthly"),
+  /** Day of month (1–31, clamped to month length) for monthly/yearly. */
+  dayOfMonth: integer("day_of_month"),
+  /** 0=Sunday … 6=Saturday, for weekly. */
+  dayOfWeek: integer("day_of_week"),
+  /** Month 1–12, for yearly. */
+  monthOfYear: integer("month_of_year"),
+  /** Last date this template was logged from — drives "already done" state. */
+  lastLoggedDate: date("last_logged_date"),
+  isArchived: boolean("is_archived").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

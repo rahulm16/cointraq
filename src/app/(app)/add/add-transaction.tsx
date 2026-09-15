@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 import type { Account, Category, PaymentMethod } from "@/lib/types";
 import type { TitlesByKind } from "@/lib/txn-display";
 import { createTransaction } from "@/actions/transactions";
@@ -49,6 +49,7 @@ export function AddTransaction({
   today,
   lastStatements,
   titlesByKind,
+  titleMemory = {},
 }: {
   accounts: Account[];
   methods: PaymentMethod[];
@@ -56,6 +57,8 @@ export function AddTransaction({
   today: string;
   lastStatements: { cardId: number; remaining: number; lastStatement: number }[];
   titlesByKind: TitlesByKind;
+  /** Lowercased title → the category/method last used with it (P3). */
+  titleMemory?: Record<string, { categoryId: number | null; methodId: number | null }>;
 }) {
   const [tab, setTab] = useState<Tab>("spend");
   const [state, formAction, pending] = useActionState(createTransaction, initial);
@@ -66,6 +69,45 @@ export function AddTransaction({
   // Track the selected spend method to show the CC cycle hint.
   const defaultMethod = methods.find((m) => m.isDefault) ?? methods[0] ?? null;
   const [spendMethod, setSpendMethod] = useState<PaymentMethod | null>(defaultMethod);
+
+  /**
+   * Title → category/method recall (P3). `nonce` bumps on every successful
+   * inference to remount the pickers, which seed their state from defaultId.
+   * Only fills fields the user hasn't already set, so it never overrides a choice.
+   */
+  const [inferred, setInferred] = useState<{
+    categoryId: number | null;
+    methodId: number | null;
+    nonce: number;
+  }>({ categoryId: null, methodId: null, nonce: 0 });
+
+  const inferFromTitle = useCallback(
+    (title: string) => {
+      const key = title.trim().toLowerCase();
+      if (!key) return;
+      const hit = titleMemory[key];
+      if (!hit) return;
+
+      const form = formRef.current;
+      const currentCat = form?.querySelector<HTMLInputElement>('input[name="categoryId"]')?.value ?? "";
+
+      // Respect an explicit category choice; only fill a blank one.
+      if (currentCat !== "") return;
+      if (hit.categoryId == null && hit.methodId == null) return;
+
+      setInferred((prev) => ({
+        categoryId: hit.categoryId,
+        methodId: hit.methodId,
+        nonce: prev.nonce + 1,
+      }));
+
+      if (hit.methodId != null) {
+        const m = methods.find((x) => x.id === hit.methodId) ?? null;
+        if (m) setSpendMethod(m);
+      }
+    },
+    [titleMemory, methods],
+  );
 
   const banks = accounts.filter((a) => a.type === "bank");
   const nonCredit = accounts.filter((a) => a.type !== "credit_card");
@@ -145,22 +187,29 @@ export function AddTransaction({
             <TitleInput
               suggestions={titlesByKind[tab]}
               placeholder={TITLE_PLACEHOLDER[tab]}
+              onPick={tab === "spend" ? inferFromTitle : undefined}
             />
           </Field>
 
           {tab === "spend" && (
             <>
               <Field label="Method" error={state.errors?.methodId}>
+                {/* Remount on inference so the chips re-seed from the recalled method. */}
                 <MethodChips
+                  key={`method-${inferred.nonce}`}
                   methods={methods}
                   accounts={accounts}
-                  defaultId={defaultMethod?.id ?? null}
+                  defaultId={inferred.methodId ?? defaultMethod?.id ?? null}
                   onSelect={setSpendMethod}
                 />
               </Field>
               {spendCard && <CcHint billingDay={spendCard.billingDay ?? 1} date={today} />}
               <Field label="Category (optional)">
-                <CategoryPicker categories={categories} />
+                <CategoryPicker
+                  key={`cat-${inferred.nonce}`}
+                  categories={categories}
+                  defaultId={inferred.categoryId}
+                />
               </Field>
             </>
           )}

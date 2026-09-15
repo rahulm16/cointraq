@@ -1,5 +1,6 @@
 import { Dock, Sidebar } from "@/components/nav";
 import { AppToaster } from "@/components/app-toaster";
+import { CommandPalette } from "@/components/command-palette";
 
 // Every authed page reads per-request data (DB, cookies); never prerender them.
 export const dynamic = "force-dynamic";
@@ -20,6 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Dock />
       </div>
       <AppToaster />
+      <CommandPalette />
     </>
   );
 }

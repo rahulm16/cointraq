@@ -1,21 +1,8 @@
 "use client";
 
-import {
-  BarChart,
-  Bar,
-  Cell,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  LineChart,
-  Line,
-  Tooltip,
-} from "recharts";
+import { Cell, ResponsiveContainer, PieChart, Pie, Tooltip } from "recharts";
 import { CATEGORY_COLOR_HEX, type CategoryColor } from "@/lib/constants";
 import { formatINR } from "@/lib/money";
-import { formatDayShort, formatMonthLabel } from "@/lib/dates";
 
 const PRIMARY = "var(--primary)";
 
@@ -34,28 +21,6 @@ function ChartTip({ active, payload, label }: { active?: boolean; payload?: { va
         {payload[0].name ? `${payload[0].name}: ` : ""}
         {formatINR(payload[0].value)}
       </div>
-    </div>
-  );
-}
-
-export function DailyBars({ data }: { data: { date: string; total: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={140}>
-      <BarChart data={data} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-        <XAxis dataKey="date" hide />
-        <YAxis hide />
-        <Tooltip cursor={{ fill: "transparent" }} content={<TipDay />} />
-        <Bar dataKey="total" fill={PRIMARY} radius={[4, 4, 0, 0]} isAnimationActive animationDuration={500} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-function TipDay({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-control bg-surface-overlay px-3 py-2 shadow-[var(--shadow-overlay)]">
-      <div className="text-[11px] text-text-faint tnum">{label ? formatDayShort(label) : ""}</div>
-      <div className="text-[12.5px] tnum font-medium text-text-primary">{formatINR(payload[0].value)}</div>
     </div>
   );
 }
@@ -87,28 +52,6 @@ export function CategoryDonut({
           </li>
         ))}
       </ul>
-    </div>
-  );
-}
-
-export function TrendLine({ data }: { data: { month: string; total: number }[] }) {
-  return (
-    <ResponsiveContainer width="100%" height={140}>
-      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-        <XAxis dataKey="month" tickFormatter={(m) => formatMonthLabel(m).slice(0, 3)} tick={{ fontSize: 10, fill: "var(--text-faint)" }} axisLine={false} tickLine={false} />
-        <YAxis hide />
-        <Tooltip content={<TipMonth />} />
-        <Line type="monotone" dataKey="total" stroke={PRIMARY} strokeWidth={2} dot={{ r: 3, fill: PRIMARY }} isAnimationActive animationDuration={600} />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-}
-function TipMonth({ active, payload, label }: { active?: boolean; payload?: { value: number }[]; label?: string }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-control bg-surface-overlay px-3 py-2 shadow-[var(--shadow-overlay)]">
-      <div className="text-[11px] text-text-faint">{label ? formatMonthLabel(label) : ""}</div>
-      <div className="text-[12.5px] tnum font-medium text-text-primary">{formatINR(payload[0].value)}</div>
     </div>
   );
 }

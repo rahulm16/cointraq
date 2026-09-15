@@ -20,6 +20,7 @@ import { AccountForm } from "./account-form";
 import { MethodForm } from "./method-form";
 import { CategoryForm } from "./category-form";
 import { ExportButton } from "./export-button";
+import { ImportButton } from "./import-button";
 
 type Editor =
   | { kind: "account"; value: Account | null }
@@ -159,6 +160,15 @@ export function SettingsClient({
               <div className="text-[12px] text-text-secondary">Download all data as a CSV zip.</div>
             </div>
             <ExportButton />
+          </div>
+          <div className="flex items-center justify-between gap-4 flex-wrap border-t border-border pt-5">
+            <div>
+              <div className="text-[14px] font-semibold text-text-primary">Import</div>
+              <div className="text-[12px] text-text-secondary">
+                Add transactions from a CSV. Previewed before anything is written.
+              </div>
+            </div>
+            <ImportButton />
           </div>
           <div className="flex items-center justify-between gap-4 flex-wrap border-t border-border pt-5">
             <div>

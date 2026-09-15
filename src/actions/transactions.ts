@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
 import { transactions, accounts, paymentMethods } from "@/db/schema";
@@ -276,4 +276,156 @@ export async function deleteTransaction(id: number): Promise<ActionResult> {
   revalidatePath("/");
   revalidatePath("/transactions");
   return okResult("Deleted");
+}
+
+/**
+ * Delete, returning the full row so the client can offer an Undo that recreates
+ * it. Simpler than a soft-delete column: nothing else in the app has to learn to
+ * filter out tombstones, and the undo window lives entirely in the toast.
+ */
+export async function deleteTransactionWithUndo(
+  id: number,
+): Promise<ActionResult & { restore?: BuiltTxn }> {
+  await requireAuth();
+  const [row] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+  if (!row) return errResult({ _: "Not found" }, "Not found");
+
+  await db.delete(transactions).where(eq(transactions.id, id));
+  revalidatePath("/");
+  revalidatePath("/transactions");
+
+  return {
+    ...okResult("Deleted"),
+    restore: {
+      type: row.type,
+      amount: row.amount,
+      date: row.date,
+      title: row.title,
+      categoryId: row.categoryId,
+      methodId: row.methodId,
+      fromAccountId: row.fromAccountId,
+      toAccountId: row.toAccountId,
+      incomeSource: row.incomeSource,
+    },
+  };
+}
+
+/** Re-insert a row captured by `deleteTransactionWithUndo`. */
+export async function restoreTransaction(txn: BuiltTxn): Promise<ActionResult> {
+  await requireAuth();
+  const parsed = z
+    .object({
+      type: z.enum(["expense", "cc_spend", "bill_pay", "transfer", "withdrawal", "income"]),
+      amount: amountSchema,
+      date: dateSchema,
+      title: z.string().trim().min(1),
+      categoryId: z.number().int().positive().nullable(),
+      methodId: z.number().int().positive().nullable(),
+      fromAccountId: z.number().int().positive().nullable(),
+      toAccountId: z.number().int().positive().nullable(),
+      incomeSource: incomeSourceSchema.nullable(),
+    })
+    .safeParse(txn);
+  if (!parsed.success) return errResult(fieldErrors(parsed.error));
+
+  await db.insert(transactions).values(parsed.data);
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  return okResult("Restored");
+}
+
+/**
+ * One-tap logging from a quick-add chip. Takes only what a chip carries and
+ * re-derives everything else server-side — the spend type from the method's
+ * account (SPEC §4 rule 1), and the date clamped to today so a stale client
+ * can't post into the future.
+ */
+export async function quickLog(input: {
+  title: string;
+  amount: number;
+  categoryId: number | null;
+  methodId: number | null;
+  date: string;
+}): Promise<ActionResult> {
+  await requireAuth();
+
+  const parsed = z
+    .object({
+      title: z.string().trim().min(1).max(200),
+      amount: amountSchema,
+      categoryId: z.number().int().positive().nullable(),
+      methodId: z.number().int().positive().nullable(),
+      date: dateSchema,
+    })
+    .safeParse(input);
+  if (!parsed.success) return errResult(fieldErrors(parsed.error));
+
+  const d = parsed.data;
+  if (futureRejected(d.date)) return errResult({ date: "Future dates are not allowed" });
+
+  const lk = await loadLookups();
+  const methodType = d.methodId != null ? lk.methodAccountType.get(d.methodId) : undefined;
+  if (d.methodId != null && !methodType) return errResult({ methodId: "Unknown method" });
+
+  const type = deriveSpendType(methodType ?? ("bank" as AccountType));
+
+  await db.insert(transactions).values({
+    type,
+    amount: d.amount,
+    date: d.date,
+    title: d.title,
+    categoryId: categoryAllowed(type) ? d.categoryId : null,
+    methodId: d.methodId,
+    fromAccountId: null,
+    toAccountId: null,
+    incomeSource: null,
+  });
+
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  return okResult("Logged");
+}
+
+/** Reassign many transactions to one category at once (bulk edit, P6). */
+export async function bulkSetCategory(ids: number[], categoryId: number | null): Promise<ActionResult> {
+  await requireAuth();
+  const clean = ids.filter((id) => Number.isInteger(id));
+  if (clean.length === 0) return errResult({ _: "Nothing selected" });
+
+  // Only expense/cc_spend may carry a category (SPEC §4 rule 3) — skip the rest
+  // rather than silently dropping the value.
+  const rows = await db
+    .select({ id: transactions.id, type: transactions.type })
+    .from(transactions)
+    .where(inArray(transactions.id, clean));
+
+  const eligible = rows.filter((r) => categoryAllowed(r.type)).map((r) => r.id);
+  if (eligible.length === 0) return errResult({ _: "No eligible transactions" }, "Categories apply to spends only");
+
+  await db
+    .update(transactions)
+    .set({ categoryId, updatedAt: new Date() })
+    .where(inArray(transactions.id, eligible));
+
+  revalidatePath("/");
+  revalidatePath("/transactions");
+
+  const skipped = clean.length - eligible.length;
+  return okResult(
+    skipped > 0
+      ? `Updated ${eligible.length}, skipped ${skipped} non-spend`
+      : `Updated ${eligible.length}`,
+  );
+}
+
+/** Delete many at once. */
+export async function bulkDelete(ids: number[]): Promise<ActionResult> {
+  await requireAuth();
+  const clean = ids.filter((id) => Number.isInteger(id));
+  if (clean.length === 0) return errResult({ _: "Nothing selected" });
+
+  await db.delete(transactions).where(inArray(transactions.id, clean));
+  revalidatePath("/");
+  revalidatePath("/transactions");
+  return okResult(`Deleted ${clean.length}`);
 }

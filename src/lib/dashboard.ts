@@ -6,7 +6,7 @@ import {
   categoryBreakdownRange,
   topCategoryRange,
   byMethodRange,
-  sixMonthTrend,
+  monthlyTotals,
   ccSpendByCategory,
 } from "./aggregations";
 import { accountExpected } from "./compute";
@@ -43,7 +43,8 @@ export interface DashboardData {
   }[];
   dailyBars: { date: string; total: number }[];
   donut: { label: string; value: number; color: CategoryColor | "ccbill" | "uncategorized" }[];
-  trend: { month: string; total: number }[];
+  /** Trailing 12 months of hero totals, oldest→newest, ending at the viewed month. */
+  monthlyBars: { month: string; total: number }[];
   methodBars: { name: string; total: number }[];
   recent: Transaction[];
 }
@@ -122,8 +123,8 @@ export function buildDashboard(input: {
 
   const anchorMk = monthKey(to);
   const months: string[] = [];
-  for (let i = 5; i >= 0; i--) months.push(shiftMonth(anchorMk, -i));
-  const trend = sixMonthTrend(effects, months);
+  for (let i = 11; i >= 0; i--) months.push(shiftMonth(anchorMk, -i));
+  const monthlyBars = monthlyTotals(effects, months);
 
   const mBars = byMethodRange(effects, from, to);
   const methodBars = [...mBars.entries()]
@@ -146,7 +147,7 @@ export function buildDashboard(input: {
     cards,
     dailyBars,
     donut,
-    trend,
+    monthlyBars,
     methodBars,
     recent: recentInRange,
   };

@@ -101,10 +101,16 @@ export function TitleInput({
   suggestions,
   defaultValue,
   placeholder,
+  onPick,
 }: {
   suggestions: string[];
   defaultValue?: string;
   placeholder?: string;
+  /**
+   * Fired when a title is chosen or typed to an exact past match, so the parent
+   * can pre-fill the category/method the user last paired with it (P3).
+   */
+  onPick?: (title: string) => void;
 }) {
   const [query, setQuery] = useState(defaultValue ?? "");
   const [open, setOpen] = useState(false);
@@ -134,7 +140,9 @@ export function TitleInput({
           setQuery(e.target.value);
           setOpen(e.target.value.trim().length > 0);
         }}
-        onBlur={() => {
+        onBlur={(e) => {
+          // A typed-out exact match should infer just like a picked one.
+          onPick?.(e.target.value);
           // Delay so a mousedown on a suggestion can fire first.
           window.setTimeout(() => setOpen(false), 120);
         }}
@@ -156,6 +164,7 @@ export function TitleInput({
                     input.value = s;
                     setQuery(s);
                   }
+                  onPick?.(s);
                   setOpen(false);
                 }}
               >

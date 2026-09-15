@@ -1,11 +1,14 @@
 import "server-only";
 import { db } from "./client";
-import { accounts, paymentMethods, categories, transactions, snapshots } from "./schema";
-import { eq, asc, desc, and, gte, lte, ilike, type SQL } from "drizzle-orm";
+import { accounts, paymentMethods, categories, transactions, snapshots, budgets, recurringTemplates } from "./schema";
+import { eq, asc, desc, and, or, gte, lte, ilike, type SQL } from "drizzle-orm";
+import { parseSearch, isEmptyQuery } from "@/lib/search";
 import type {
   Account,
+  Budget,
   Category,
   PaymentMethod,
+  RecurringTemplate,
   Snapshot,
   Transaction,
   TransactionType,
@@ -128,7 +131,21 @@ export async function getFilteredTransactions(f: TxnFilter): Promise<Transaction
   if (f.type) conds.push(eq(transactions.type, f.type as Transaction["type"]));
   if (f.methodId) conds.push(eq(transactions.methodId, f.methodId));
   if (f.categoryId) conds.push(eq(transactions.categoryId, f.categoryId));
-  if (f.search && f.search.trim()) conds.push(ilike(transactions.title, `%${f.search.trim()}%`));
+
+  // Search understands amounts and ranges as well as title text (lib/search).
+  const q = parseSearch(f.search);
+  if (!isEmptyQuery(q)) {
+    if (q.min !== null) conds.push(gte(transactions.amount, q.min));
+    if (q.max !== null) conds.push(lte(transactions.amount, q.max));
+    if (q.amount !== null && q.text) {
+      // A bare number: match the amount OR the title, so "2024" finds both.
+      conds.push(
+        or(eq(transactions.amount, q.amount), ilike(transactions.title, `%${q.text}%`)) as SQL,
+      );
+    } else if (q.text) {
+      conds.push(ilike(transactions.title, `%${q.text}%`));
+    }
+  }
 
   const rows = await db
     .select()
@@ -225,6 +242,153 @@ function mapTxn(r: typeof transactions.$inferSelect): Transaction {
     fromAccountId: r.fromAccountId,
     toAccountId: r.toAccountId,
     incomeSource: r.incomeSource,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+/* ---- Budgets ---- */
+
+/** Every budget row. Volumes are tiny; lib/budgets filters by month. */
+export async function getBudgets(): Promise<Budget[]> {
+  const rows = await db.select().from(budgets).orderBy(asc(budgets.month));
+  return rows.map(mapBudget);
+}
+
+/* ---- Recurring templates ---- */
+
+export async function getRecurringTemplates(includeArchived = false): Promise<RecurringTemplate[]> {
+  const rows = await db
+    .select()
+    .from(recurringTemplates)
+    .orderBy(asc(recurringTemplates.sortOrder), asc(recurringTemplates.id));
+  const mapped = rows.map(mapTemplate);
+  return includeArchived ? mapped : mapped.filter((t) => !t.isArchived);
+}
+
+/* ---- Title → category/method inference (P3) ---- */
+
+export interface TitleMemory {
+  /** Lowercased title → the most recent categoryId/methodId used with it. */
+  byTitle: Record<string, { categoryId: number | null; methodId: number | null }>;
+}
+
+/**
+ * What the user last did for each spend title, so re-typing "chai" can pre-fill
+ * its category and method. Built from recent spends only — a title's meaning
+ * drifts, and the newest use is the best guess.
+ */
+export async function getTitleMemory(limit = 600): Promise<TitleMemory> {
+  const rows = await db
+    .select({
+      title: transactions.title,
+      categoryId: transactions.categoryId,
+      methodId: transactions.methodId,
+      type: transactions.type,
+    })
+    .from(transactions)
+    .orderBy(desc(transactions.date), desc(transactions.createdAt))
+    .limit(limit);
+
+  const byTitle: TitleMemory["byTitle"] = {};
+  for (const r of rows) {
+    if (r.type !== "expense" && r.type !== "cc_spend") continue;
+    const key = r.title.trim().toLowerCase();
+    if (!key || key in byTitle) continue; // first hit is the newest
+    byTitle[key] = { categoryId: r.categoryId, methodId: r.methodId };
+  }
+  return { byTitle };
+}
+
+/**
+ * The user's most-repeated recent spends, for one-tap quick-add chips (P3).
+ * Ranked by frequency then recency, so the chips reflect actual habits.
+ */
+export interface QuickAddSuggestion {
+  title: string;
+  amount: number;
+  categoryId: number | null;
+  methodId: number | null;
+  count: number;
+}
+
+export async function getQuickAddSuggestions(limit = 5, scan = 400): Promise<QuickAddSuggestion[]> {
+  const rows = await db
+    .select({
+      title: transactions.title,
+      amount: transactions.amount,
+      categoryId: transactions.categoryId,
+      methodId: transactions.methodId,
+      type: transactions.type,
+    })
+    .from(transactions)
+    .orderBy(desc(transactions.date), desc(transactions.createdAt))
+    .limit(scan);
+
+  const groups = new Map<string, QuickAddSuggestion & { amounts: number[] }>();
+  for (const r of rows) {
+    if (r.type !== "expense" && r.type !== "cc_spend") continue;
+    const title = r.title.trim();
+    const key = title.toLowerCase();
+    if (!key) continue;
+    const g = groups.get(key);
+    if (g) {
+      g.count++;
+      g.amounts.push(r.amount);
+    } else {
+      groups.set(key, {
+        title,
+        amount: r.amount, // newest amount is the default
+        categoryId: r.categoryId,
+        methodId: r.methodId,
+        count: 1,
+        amounts: [r.amount],
+      });
+    }
+  }
+
+  return [...groups.values()]
+    .filter((g) => g.count >= 2) // a one-off isn't a habit
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((g) => ({
+      title: g.title,
+      amount: g.amount,
+      categoryId: g.categoryId,
+      methodId: g.methodId,
+      count: g.count,
+    }));
+}
+
+function mapBudget(r: typeof budgets.$inferSelect): Budget {
+  return {
+    id: r.id,
+    categoryId: r.categoryId,
+    month: r.month,
+    amount: r.amount,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function mapTemplate(r: typeof recurringTemplates.$inferSelect): RecurringTemplate {
+  return {
+    id: r.id,
+    title: r.title,
+    type: r.type,
+    amount: r.amount,
+    categoryId: r.categoryId,
+    methodId: r.methodId,
+    fromAccountId: r.fromAccountId,
+    toAccountId: r.toAccountId,
+    incomeSource: r.incomeSource,
+    recurrence: r.recurrence,
+    dayOfMonth: r.dayOfMonth,
+    dayOfWeek: r.dayOfWeek,
+    monthOfYear: r.monthOfYear,
+    lastLoggedDate: r.lastLoggedDate,
+    isArchived: r.isArchived,
+    sortOrder: r.sortOrder,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };

@@ -6,20 +6,33 @@ import {
   getSnapshots,
   getRecentTransactions,
   getTitlesByKind,
+  getBudgets,
+  getRecurringTemplates,
+  getQuickAddSuggestions,
 } from "@/db/queries";
 import { buildDashboard } from "@/lib/dashboard";
-import { monthKey, resolvePeriod, todayIST } from "@/lib/dates";
+import { monthKey, monthRange, resolvePeriod, shiftMonth, todayIST } from "@/lib/dates";
+import { dailyTotalsInRange } from "@/lib/aggregations";
 import { formatINR } from "@/lib/money";
+import { monthBudgets } from "@/lib/budgets";
+import { dueNow } from "@/lib/recurring";
+import { buildInsights } from "@/lib/insights";
 import { PeriodBar, PeriodTransition } from "@/components/period-bar";
 import { Entrance, EntranceItem } from "@/components/entrance";
 import { INRFlow } from "@/components/inr-flow";
-import { Card, Eyebrow, EmptyState } from "@/components/ui";
+import { Card, Eyebrow } from "@/components/ui";
 import { categoryClasses } from "@/lib/ui";
 import { CcWidget } from "./cc-widget";
 import { RecentList } from "./recent-list";
-import { DailyBars, CategoryDonut, TrendLine, MethodBars } from "./charts";
+import { BudgetCard } from "./budget-card";
+import { DueStrip } from "./due-strip";
+import { QuickAdd } from "./quick-add";
+import { InsightCards } from "./insight-cards";
+import { YearHeatmap } from "./year-heatmap";
+import { FirstRun } from "./onboarding";
+import { CategoryDonut, MethodBars } from "./charts";
+import { SpendChart } from "./spend-chart";
 import { APP_NAME } from "@/lib/constants";
-import Link from "next/link";
 import { TrendingDown, TrendingUp, Wallet, Tag, Landmark } from "lucide-react";
 
 export const metadata = { title: APP_NAME };
@@ -34,7 +47,18 @@ export default async function DashboardPage({
   const nowMonth = monthKey(today);
   const { from, to } = resolvePeriod(sp, today);
 
-  const [accounts, methods, categories, effects, snapshots, recent, titlesByKind] = await Promise.all([
+  const [
+    accounts,
+    methods,
+    categories,
+    effects,
+    snapshots,
+    recent,
+    titlesByKind,
+    allBudgets,
+    templates,
+    quickAdds,
+  ] = await Promise.all([
     getAccounts(true),
     getMethods(true),
     getCategories(true),
@@ -42,20 +66,29 @@ export default async function DashboardPage({
     getSnapshots(),
     getRecentTransactions(8, { from, to }),
     getTitlesByKind(),
+    getBudgets(),
+    getRecurringTemplates(),
+    getQuickAddSuggestions(),
   ]);
 
+  // Budgets are a calendar-month concept; anchor them to the viewed period's month.
+  const viewMonth = monthKey(from);
+  const budgets = monthBudgets(allBudgets, effects, viewMonth, today);
+  const due = dueNow(templates, today);
+  const insights = buildInsights({ effects, categories, methods, from, to, today });
+
+  // Trailing 12 months of daily totals for the heatmap, independent of the
+  // selected period — it's a "zoom out" view, not a period-scoped one.
+  const yearFrom = monthRange(shiftMonth(monthKey(today), -11)).start;
+  const heatmapDays = dailyTotalsInRange(effects, yearFrom, today);
+
+  // First run: no transactions yet. Collect opening balances and a cap rather
+  // than showing an empty dashboard — those two numbers are what make the first
+  // reconcile and the pace ring meaningful.
   if (effects.length === 0) {
     return (
       <main className="max-w-[1120px] mx-auto p-4 lg:p-8">
-        <EmptyState
-          title="Nothing logged yet"
-          body="Log your first spend to see your month come to life."
-          action={
-            <Link href="/add" className="h-10 px-4 rounded-control bg-primary text-primary-contrast font-semibold text-[14px] inline-flex items-center">
-              Log your first spend
-            </Link>
-          }
-        />
+        <FirstRun accounts={accounts.filter((a) => !a.isArchived)} month={monthKey(today)} />
       </main>
     );
   }
@@ -89,6 +122,18 @@ export default async function DashboardPage({
               </div>
             )}
           </EntranceItem>
+
+          {quickAdds.length > 0 && (
+            <EntranceItem>
+              <QuickAdd suggestions={quickAdds} categories={categories} today={today} />
+            </EntranceItem>
+          )}
+
+          {insights.length > 0 && (
+            <EntranceItem>
+              <InsightCards insights={insights} />
+            </EntranceItem>
+          )}
 
           <EntranceItem className="grid grid-cols-3 gap-2.5">
             <Card lift className="!p-[12px_12px_14px]">
@@ -125,12 +170,12 @@ export default async function DashboardPage({
           </EntranceItem>
 
           <EntranceItem>
-            <Card>
-              <Eyebrow>Daily spend</Eyebrow>
-              <div className="mt-2">
-                <DailyBars data={d.dailyBars} />
-              </div>
-            </Card>
+            <SpendChart
+              daily={d.dailyBars}
+              monthly={d.monthlyBars}
+              periodLabel={d.periodLabel}
+              today={today}
+            />
           </EntranceItem>
 
           <EntranceItem className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -148,17 +193,24 @@ export default async function DashboardPage({
             </Card>
           </EntranceItem>
 
-          <EntranceItem>
-            <Card>
-              <Eyebrow>6-month trend</Eyebrow>
-              <div className="mt-2">
-                <TrendLine data={d.trend} />
-              </div>
+          <EntranceItem className="min-w-0">
+            <Card className="min-w-0">
+              <YearHeatmap days={heatmapDays} today={today} />
             </Card>
           </EntranceItem>
         </div>
 
         <div className="flex flex-col gap-4">
+          {due.length > 0 && (
+            <EntranceItem>
+              <DueStrip items={due} categories={categories} methods={methods} />
+            </EntranceItem>
+          )}
+
+          <EntranceItem>
+            <BudgetCard budgets={budgets} categories={categories} month={viewMonth} />
+          </EntranceItem>
+
           {d.cards.map((c) => (
             <EntranceItem key={c.account.id}>
               <CcWidget card={c} />

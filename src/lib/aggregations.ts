@@ -1,5 +1,5 @@
 import type { TxnEffect } from "./types";
-import { inDateRange, monthRange } from "./dates";
+import { inDateRange, monthRange, shiftDate } from "./dates";
 
 /**
  * The "hero" formula — Spends this month = Σ expense + Σ bill_pay.
@@ -141,12 +141,29 @@ export function byMethod(txns: TxnEffect[], mk: string): Map<number | null, numb
   return byMethodRange(txns, start, end);
 }
 
-/** 6-month trend: hero total per month, oldest→newest, ending at `mk`. */
-export function sixMonthTrend(
+/** Hero total per month for the given month keys, in the order supplied. */
+export function monthlyTotals(
   txns: TxnEffect[],
   months: string[],
 ): { month: string; total: number }[] {
   return months.map((m) => ({ month: m, total: heroForMonth(txns, m) }));
+}
+
+/**
+ * Every day in a range with its hero total, zeros included — the calendar
+ * heatmap needs a dense series, not just the days that had spending.
+ */
+export function dailyTotalsInRange(
+  txns: TxnEffect[],
+  from: string,
+  to: string,
+): { date: string; total: number }[] {
+  const byDay = dailyHeroRange(txns, from, to);
+  const out: { date: string; total: number }[] = [];
+  for (let d = from; d <= to; d = shiftDate(d, 1)) {
+    out.push({ date: d, total: byDay.get(d) ?? 0 });
+  }
+  return out;
 }
 
 /** CC section mini-breakdown: cc_spend grouped by category for a date range. */

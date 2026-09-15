@@ -67,6 +67,38 @@ export interface Snapshot {
   createdAt: Date;
 }
 
+export type Recurrence = "monthly" | "weekly" | "yearly";
+
+export interface Budget {
+  id: number;
+  categoryId: number | null; // null = overall month cap
+  month: string; // "yyyy-MM"
+  amount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RecurringTemplate {
+  id: number;
+  title: string;
+  type: TransactionType;
+  amount: number;
+  categoryId: number | null;
+  methodId: number | null;
+  fromAccountId: number | null;
+  toAccountId: number | null;
+  incomeSource: IncomeSource | null;
+  recurrence: Recurrence;
+  dayOfMonth: number | null;
+  dayOfWeek: number | null;
+  monthOfYear: number | null;
+  lastLoggedDate: string | null;
+  isArchived: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 // A minimal transaction shape the pure balance/aggregation math operates on.
 // Framework-free — no DB rows required, just these fields.
 export interface TxnEffect {

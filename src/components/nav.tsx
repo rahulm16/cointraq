@@ -17,6 +17,7 @@ import {
   Moon,
   Sun,
   LogOut,
+  Target,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/ui";
@@ -36,6 +37,19 @@ const items: NavItem[] = [
   { href: "/transactions", label: "Transactions", icon: ListOrdered },
   { href: "/reconcile", label: "Reconcile", icon: ArrowLeftRight },
   { href: "/settings", label: "Settings", icon: SlidersHorizontal },
+];
+
+/**
+ * The desktop rail carries Budgets as well. The mobile dock stays at four
+ * destinations plus the center action — a fifth icon there would squeeze the
+ * 44px touch targets (§9), so on mobile Budgets is reached from its dashboard card.
+ */
+const railItems: NavItem[] = [
+  items[0],
+  items[1],
+  { href: "/budgets", label: "Budgets", icon: Target },
+  items[2],
+  items[3],
 ];
 
 function isActive(pathname: string, href: string): boolean {
@@ -116,7 +130,7 @@ export function Sidebar() {
 
         {/* Nav */}
         <nav className="flex flex-col gap-0.5 mt-1">
-          {items.map((it, i) => {
+          {railItems.map((it, i) => {
             const active = isActive(pathname, it.href);
             const Icon = it.icon;
             return (

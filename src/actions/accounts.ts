@@ -2,10 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { eq, sql } from "drizzle-orm";
+import { z } from "zod";
 import { db } from "@/db/client";
 import { accounts } from "@/db/schema";
 import { accountInputSchema, billingDaySchema } from "@/lib/validation";
 import { fieldErrors } from "@/lib/validation";
+import { AMOUNT_MAX } from "@/lib/constants";
 import { requireAuth, okResult, errResult, type ActionResult } from "./shared";
 
 function parseAccountForm(formData: FormData) {
@@ -93,4 +95,37 @@ export async function setAccountArchived(id: number, archived: boolean): Promise
   await db.update(accounts).set({ isArchived: archived }).where(eq(accounts.id, id));
   revalidatePath("/settings");
   return okResult(archived ? "Archived" : "Restored");
+}
+
+/**
+ * Set several opening balances at once — the first-run setup step.
+ * Opening balance is the baseline every derived balance counts forward from
+ * (SPEC §5), so getting it right here is what makes the first reconcile useful.
+ */
+export async function setOpeningBalances(
+  entries: { accountId: number; openingBalance: number }[],
+): Promise<ActionResult> {
+  await requireAuth();
+
+  const parsed = z
+    .array(
+      z.object({
+        accountId: z.number().int().positive(),
+        openingBalance: z.number().int().min(0).max(AMOUNT_MAX),
+      }),
+    )
+    .safeParse(entries);
+  if (!parsed.success) return errResult(fieldErrors(parsed.error), "Invalid balance");
+
+  for (const e of parsed.data) {
+    await db
+      .update(accounts)
+      .set({ openingBalance: e.openingBalance })
+      .where(eq(accounts.id, e.accountId));
+  }
+
+  revalidatePath("/");
+  revalidatePath("/settings");
+  revalidatePath("/reconcile");
+  return okResult("Balances saved");
 }
