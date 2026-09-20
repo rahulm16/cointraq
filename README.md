@@ -140,3 +140,11 @@ and private vulnerability reporting guidance.
 Bug reports and feature suggestions are welcome. Pull requests and external
 patches are not accepted. You may fork and modify the project; see
 [CONTRIBUTING.md](CONTRIBUTING.md) for the policy and reporting guidance.
+
+## Releases and checks
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes. GitHub Actions runs on pushes
+and manual dispatch, using Node.js 24 and PostgreSQL 17 to check a clean install,
+fresh migrations and migration reruns, tests, TypeScript, and a production build.
+CI uses a disposable database without seed data. Existing lint issues are listed
+in the changelog; lint is not currently a CI gate.

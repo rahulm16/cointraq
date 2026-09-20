@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: cointraq
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: cointraq_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cointraq -d cointraq_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://cointraq:ci-only-password@localhost:5432/cointraq_ci
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Generate disposable authentication settings
+        run: |
+          node -e 'const crypto = require("node:crypto"); const bcrypt = require("bcryptjs"); console.log("SESSION_SECRET=" + crypto.randomBytes(48).toString("base64")); console.log("APP_PASSWORD_HASH=" + Buffer.from(bcrypt.hashSync(crypto.randomBytes(32).toString("hex"), 10)).toString("base64"));' >> "$GITHUB_ENV"
+      - name: Apply migrations to an empty database
+        run: npm run db:migrate
+      - name: Check migration reruns
+        run: npm run db:migrate
+      - run: npm test
+      - name: Generate Next.js route types
+        run: npx next typegen
+      - run: npm run typecheck
+      - run: npm run build
