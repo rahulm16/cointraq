@@ -148,3 +148,7 @@ and manual dispatch, using Node.js 24 and PostgreSQL 17 to check a clean install
 fresh migrations and migration reruns, tests, TypeScript, and a production build.
 CI uses a disposable database without seed data. Existing lint issues are listed
 in the changelog; lint is not currently a CI gate.
+
+## License
+
+[MIT](LICENSE). Copyright (c) 2026 rahulm16.
