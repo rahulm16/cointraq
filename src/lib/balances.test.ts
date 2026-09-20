@@ -98,3 +98,17 @@ describe("ccOutstanding", () => {
     expect(ccOutstanding(card, "2026-07-31", txns, methodAccount)).toBe(9640 - 14200);
   });
 });
+
+describe("expectedBalance — same-day transactions logged after the snapshot", () => {
+  const savedAt = new Date("2026-07-05T04:30:00Z");
+  const txns = [
+    // Logged before saving: already inside the actual balance the user counted.
+    tx({ type: "expense", amount: 500, date: "2026-07-05", methodId: 10, createdAt: new Date("2026-07-05T03:00:00Z") }),
+    // Logged after saving, same date: must still reduce the balance.
+    tx({ type: "expense", amount: 240, date: "2026-07-05", methodId: 10, createdAt: new Date("2026-07-05T08:00:00Z") }),
+  ];
+  it("counts only the ones logged after the snapshot was saved", () => {
+    const baseline = { value: 38000, date: "2026-07-05", createdAt: savedAt };
+    expect(expectedBalance(bank, "2026-07-10", txns, baseline, methodAccount)).toBe(38000 - 240);
+  });
+});

@@ -27,9 +27,9 @@ const initial: ActionResult = { ok: false };
  */
 export function EditForm({
   txn,
-  accounts,
-  methods,
-  categories,
+  accounts: allAccounts,
+  methods: allMethods,
+  categories: allCategories,
   today,
   titlesByKind,
   onDone,
@@ -48,11 +48,19 @@ export function EditForm({
   const [deleting, setDeleting] = useState(false);
   const { show } = useToast();
 
+  // Offer active choices only, plus whatever this transaction already uses even if
+  // it has been archived since — so an old entry still shows its real values.
+  const accounts = allAccounts.filter(
+    (a) => !a.isArchived || a.id === txn.fromAccountId || a.id === txn.toAccountId,
+  );
+  const methods = allMethods.filter((m) => !m.isArchived || m.id === txn.methodId);
+  const categories = allCategories.filter((c) => !c.isArchived || c.id === txn.categoryId);
+
   const banks = accounts.filter((a) => a.type === "bank");
   const nonCredit = accounts.filter((a) => a.type !== "credit_card");
   const cards = accounts.filter((a) => a.type === "credit_card");
   const nonCardMethods = methods.filter(
-    (m) => accounts.find((a) => a.id === m.accountId)?.type !== "credit_card",
+    (m) => allAccounts.find((a) => a.id === m.accountId)?.type !== "credit_card",
   );
 
   useEffect(() => {

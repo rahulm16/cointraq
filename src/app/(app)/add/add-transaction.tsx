@@ -69,42 +69,54 @@ export function AddTransaction({
   // Track the selected spend method to show the CC cycle hint.
   const defaultMethod = methods.find((m) => m.isDefault) ?? methods[0] ?? null;
   const [spendMethod, setSpendMethod] = useState<PaymentMethod | null>(defaultMethod);
+  // The card the Bill pay tab is paying, so "Full bill" shows THAT card's amount.
+  const [billCardId, setBillCardId] = useState<number | null>(
+    () => accounts.find((a) => a.type === "credit_card")?.id ?? null,
+  );
 
   /**
-   * Title → category/method recall (P3). `nonce` bumps on every successful
-   * inference to remount the pickers, which seed their state from defaultId.
-   * Only fills fields the user hasn't already set, so it never overrides a choice.
+   * Title → category/method recall (P3). Each picker remounts (via its own nonce)
+   * only when inference actually fills it. A method the user picked by hand is
+   * never replaced, and the same title isn't re-inferred on every blur.
    */
   const [inferred, setInferred] = useState<{
     categoryId: number | null;
     methodId: number | null;
-    nonce: number;
-  }>({ categoryId: null, methodId: null, nonce: 0 });
+    catNonce: number;
+    methodNonce: number;
+  }>({ categoryId: null, methodId: null, catNonce: 0, methodNonce: 0 });
+  const methodTouched = useRef(false);
+  const lastInferredTitle = useRef("");
+
+  const pickSpendMethod = useCallback((m: PaymentMethod | null) => {
+    methodTouched.current = true;
+    setSpendMethod(m);
+  }, []);
 
   const inferFromTitle = useCallback(
     (title: string) => {
       const key = title.trim().toLowerCase();
-      if (!key) return;
+      if (!key || key === lastInferredTitle.current) return;
+      lastInferredTitle.current = key;
       const hit = titleMemory[key];
       if (!hit) return;
 
       const form = formRef.current;
       const currentCat = form?.querySelector<HTMLInputElement>('input[name="categoryId"]')?.value ?? "";
 
-      // Respect an explicit category choice; only fill a blank one.
-      if (currentCat !== "") return;
-      if (hit.categoryId == null && hit.methodId == null) return;
+      // Only fill what the user hasn't chosen: a blank category, an untouched method.
+      const recalledMethod = hit.methodId != null ? (methods.find((x) => x.id === hit.methodId) ?? null) : null;
+      const fillCategory = currentCat === "" && hit.categoryId != null;
+      const fillMethod = !methodTouched.current && recalledMethod != null;
+      if (!fillCategory && !fillMethod) return;
 
       setInferred((prev) => ({
-        categoryId: hit.categoryId,
-        methodId: hit.methodId,
-        nonce: prev.nonce + 1,
+        categoryId: fillCategory ? hit.categoryId : prev.categoryId,
+        methodId: fillMethod ? hit.methodId : prev.methodId,
+        catNonce: fillCategory ? prev.catNonce + 1 : prev.catNonce,
+        methodNonce: fillMethod ? prev.methodNonce + 1 : prev.methodNonce,
       }));
-
-      if (hit.methodId != null) {
-        const m = methods.find((x) => x.id === hit.methodId) ?? null;
-        if (m) setSpendMethod(m);
-      }
+      if (fillMethod) setSpendMethod(recalledMethod);
     },
     [titleMemory, methods],
   );
@@ -149,6 +161,8 @@ export function AddTransaction({
       if (amt) amt.value = "";
       if (title) title.value = "";
       amt?.focus();
+      // The title is blank again, so the same title typed next time should recall again.
+      lastInferredTitle.current = "";
       return () => clearTimeout(t);
     }
   }, [state, show]);
@@ -160,7 +174,11 @@ export function AddTransaction({
         {TABS.map((t) => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => {
+              setTab(t.id);
+              // The form remounts per tab, so its card select starts back at the first card.
+              setBillCardId(cards[0]?.id ?? null);
+            }}
             className={cn(
               "relative flex-1 min-w-max h-9 px-3 rounded-full text-[13px] font-medium whitespace-nowrap pressable",
               tab === t.id ? "text-primary-contrast" : "text-text-secondary",
@@ -196,17 +214,17 @@ export function AddTransaction({
               <Field label="Method" error={state.errors?.methodId}>
                 {/* Remount on inference so the chips re-seed from the recalled method. */}
                 <MethodChips
-                  key={`method-${inferred.nonce}`}
+                  key={`method-${inferred.methodNonce}`}
                   methods={methods}
                   accounts={accounts}
                   defaultId={inferred.methodId ?? defaultMethod?.id ?? null}
-                  onSelect={setSpendMethod}
+                  onSelect={pickSpendMethod}
                 />
               </Field>
               {spendCard && <CcHint billingDay={spendCard.billingDay ?? 1} date={today} />}
               <Field label="Category (optional)">
                 <CategoryPicker
-                  key={`cat-${inferred.nonce}`}
+                  key={`cat-${inferred.catNonce}`}
                   categories={categories}
                   defaultId={inferred.categoryId}
                 />
@@ -221,15 +239,19 @@ export function AddTransaction({
               </Field>
               <Field label="Credit card being paid" error={state.errors?.toAccountId}>
                 <div className="flex flex-col gap-2">
-                  <AccountSelect name="toAccountId" accounts={cards} defaultId={cards[0]?.id ?? null} placeholder={cards.length ? undefined : "No credit cards"} />
-                  {cards[0] &&
-                    (() => {
-                      const st = lastStatements.find((s) => s.cardId === cards[0].id);
-                      if (!st || st.remaining <= 0) return null;
-                      return (
-                        <BillPrefill remaining={st.remaining} />
-                      );
-                    })()}
+                  <AccountSelect
+                    name="toAccountId"
+                    accounts={cards}
+                    defaultId={cards[0]?.id ?? null}
+                    placeholder={cards.length ? undefined : "No credit cards"}
+                    onChange={(v) => setBillCardId(v ? Number(v) : null)}
+                  />
+                  {(() => {
+                    // Prefill for the card actually selected, not always the first one.
+                    const st = lastStatements.find((s) => s.cardId === billCardId);
+                    if (!st || st.remaining <= 0) return null;
+                    return <BillPrefill key={st.cardId} remaining={st.remaining} />;
+                  })()}
                 </div>
               </Field>
             </>

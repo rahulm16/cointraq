@@ -28,8 +28,8 @@ function tpl(p: Partial<RecurringTemplate> = {}): RecurringTemplate {
     lastLoggedDate: null,
     isArchived: false,
     sortOrder: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: new Date("2026-07-01T00:00:00Z"),
+    updatedAt: new Date("2026-07-01T00:00:00Z"),
     ...p,
   };
 }
@@ -169,5 +169,38 @@ describe("describeSchedule", () => {
     expect(describeSchedule(tpl({ recurrence: "yearly", dayOfMonth: 3, monthOfYear: 4 }))).toBe(
       "Yearly on 3rd April",
     );
+  });
+});
+
+describe("missed and early occurrences", () => {
+  it("keeps last month's unlogged occurrence first in line after the month turns", () => {
+    const t = tpl({ dayOfMonth: 5, lastLoggedDate: "2026-07-05" });
+    const d = dueItem(t, "2026-09-02")!;
+    expect(d.dueDate).toBe("2026-08-05");
+    expect(d.state).toBe("overdue");
+  });
+
+  it("treats an occurrence logged early (stored as its due date) as done", () => {
+    // logFromTemplate stores the occurrence date, not the clamped log date.
+    const t = tpl({ dayOfMonth: 17, lastLoggedDate: "2026-09-17" });
+    expect(dueNow([t], "2026-09-15")).toHaveLength(0);
+  });
+
+  it("keeps the first missed occurrence for an older never-logged template", () => {
+    const t = tpl({
+      dayOfMonth: 5,
+      lastLoggedDate: null,
+      createdAt: new Date("2026-07-01T06:00:00Z"),
+    });
+    expect(currentOccurrence(t, "2026-09-20")).toBe("2026-07-05");
+  });
+
+  it("does not invent an overdue occurrence before a template was created", () => {
+    const t = tpl({
+      dayOfMonth: 5,
+      lastLoggedDate: null,
+      createdAt: new Date("2026-09-20T06:00:00Z"),
+    });
+    expect(currentOccurrence(t, "2026-09-20")).toBe("2026-10-05");
   });
 });

@@ -3,7 +3,7 @@ import { expectedForAll } from "@/lib/compute";
 import { ReconcileClient } from "./reconcile-client";
 import { DateBar, PeriodTransition } from "@/components/period-bar";
 import { APP_NAME } from "@/lib/constants";
-import { todayIST } from "@/lib/dates";
+import { isValidDateStr, todayIST } from "@/lib/dates";
 
 export const metadata = { title: `${APP_NAME} · Reconcile` };
 
@@ -14,7 +14,7 @@ export default async function ReconcilePage({
 }) {
   const sp = await searchParams;
   const today = todayIST();
-  const asOf = typeof sp.d === "string" && sp.d <= today ? sp.d : today;
+  const asOf = typeof sp.d === "string" && isValidDateStr(sp.d) && sp.d <= today ? sp.d : today;
 
   const [accounts, methods, effects, snapshots] = await Promise.all([
     getAccounts(true),

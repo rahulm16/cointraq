@@ -1,5 +1,5 @@
 import type { RecurringTemplate } from "./types";
-import { parseDate, toDateStr, monthRange, monthKey, shiftMonth } from "./dates";
+import { dateInIST, parseDate, toDateStr, monthRange, monthKey, shiftMonth, shiftDate } from "./dates";
 import { addDays, getDay, lastDayOfMonth, setDate } from "date-fns";
 
 /**
@@ -66,13 +66,57 @@ export function nextWeeklyOn(from: string, dayOfWeek: number): string {
 }
 
 /**
+ * The first occurrence strictly after `date` — i.e. the oldest period a log on
+ * `date` does not cover.
+ */
+export function firstOccurrenceAfter(t: RecurringTemplate, date: string): string | null {
+  switch (t.recurrence) {
+    case "weekly":
+      return nextWeeklyOn(shiftDate(date, 1), t.dayOfWeek ?? 1);
+
+    case "monthly": {
+      const mk = monthKey(date);
+      const occ = clampDayOfMonth(mk, t.dayOfMonth ?? 1);
+      return occ > date ? occ : clampDayOfMonth(shiftMonth(mk, 1), t.dayOfMonth ?? 1);
+    }
+
+    case "yearly": {
+      if (t.monthOfYear == null) return null;
+      const m = String(t.monthOfYear).padStart(2, "0");
+      const year = Number(date.slice(0, 4));
+      const occ = clampDayOfMonth(`${year}-${m}`, t.dayOfMonth ?? 1);
+      return occ > date ? occ : clampDayOfMonth(`${year + 1}-${m}`, t.dayOfMonth ?? 1);
+    }
+  }
+}
+
+/**
  * The occurrence a template is currently pointed at, relative to `today`.
  *
- * For monthly/yearly this is *this* month's occurrence — even once it has passed,
- * so a missed rent payment stays visible as overdue rather than silently rolling
- * to next month. Once logged, it advances to the next period.
+ * Normally this is the current period's occurrence — even once it has passed, so
+ * a missed rent payment shows as overdue. Once logged, it advances to the next
+ * period. A period that was never logged stays first in line across period
+ * boundaries: if the first occurrence after the last log is older than the
+ * current one, that older one is returned, so August's missed rent doesn't
+ * vanish on 1 September.
  */
 export function currentOccurrence(t: RecurringTemplate, today: string): string | null {
+  const pointer = periodOccurrence(t, today);
+  // Older rows may predate lastLoggedDate initialisation. Creation is their
+  // floor: preserve occurrences since the template existed, but never invent
+  // overdue occurrences from before it was created.
+  const createdDate = dateInIST(t.createdAt);
+  const floor = t.lastLoggedDate ?? shiftDate(createdDate, -1);
+  const oldestUnlogged = firstOccurrenceAfter(t, floor);
+  if (oldestUnlogged !== null) {
+    if (pointer === null || oldestUnlogged < pointer) return oldestUnlogged;
+    if (t.lastLoggedDate == null && pointer < createdDate) return oldestUnlogged;
+  }
+  return pointer;
+}
+
+/** The current period's occurrence, or the next period's once this one is logged. */
+function periodOccurrence(t: RecurringTemplate, today: string): string | null {
   if (t.recurrence === "weekly") {
     const dow = t.dayOfWeek ?? 1;
     // The most recent matching weekday on or before today.

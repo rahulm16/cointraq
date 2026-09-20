@@ -109,4 +109,6 @@ export interface TxnEffect {
   fromAccountId: number | null;
   toAccountId: number | null;
   categoryId: number | null;
+  /** When it was logged — decides whether a same-day transaction is inside a snapshot. */
+  createdAt?: Date;
 }

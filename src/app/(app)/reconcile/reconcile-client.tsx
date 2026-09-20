@@ -69,8 +69,8 @@ export function ReconcileClient({
         <div>
           <h1 className="text-xl font-semibold text-text-primary">Reconcile</h1>
           <p className="text-[13px] text-text-secondary mt-0.5">
-            Enter today&apos;s actual balances. Anything unaccounted is a spend you didn&apos;t log.
-            Reconcile before logging new spends for the day.
+            Enter each account&apos;s actual balance. Anything unaccounted is a spend you didn&apos;t log.
+            Spends you log after saving still count, even on the same day.
           </p>
         </div>
 
@@ -112,7 +112,6 @@ export function ReconcileClient({
                       <input
                         name={`actual_${r.id}`}
                         type="number"
-                        min={0}
                         inputMode="numeric"
                         value={raw ?? ""}
                         onChange={(e) => setActuals((a) => ({ ...a, [r.id]: e.target.value }))}

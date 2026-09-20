@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState, useTransition } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 import { Plus, Pencil, Trash2, Pause, Play, Repeat } from "lucide-react";
 import type { Account, Category, PaymentMethod, RecurringTemplate } from "@/lib/types";
 import {
@@ -216,8 +216,13 @@ function RecurringForm({
   const [recurrence, setRecurrence] = useState(template?.recurrence ?? "monthly");
   const { show } = useToast();
 
+  // Handle each result exactly once. `onDone` is a new function on every parent
+  // render and the form stays mounted while the drawer animates closed, so a plain
+  // effect would repeat the toast on each re-render.
+  const handled = useRef<ActionResult | null>(null);
   useEffect(() => {
-    if (state.ok) {
+    if (state.ok && handled.current !== state) {
+      handled.current = state;
       show(state.message ?? "Saved", { tone: "success" });
       onDone();
     }

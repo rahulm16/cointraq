@@ -33,13 +33,20 @@ export const billingDaySchema = z.number().int().min(1).max(31);
 
 /* ---- Settings entity schemas ---- */
 
-export const accountInputSchema = z.object({
-  name: z.string().trim().min(1, "Name required").max(60),
-  type: accountTypeSchema,
-  openingBalance: z.number().int().min(0).max(AMOUNT_MAX).default(0),
-  billingDay: billingDaySchema.nullable().optional(),
-  icon: iconSchema,
-});
+export const accountInputSchema = z
+  .object({
+    name: z.string().trim().min(1, "Name required").max(60),
+    type: accountTypeSchema,
+    // Banks can be overdrawn and a card can be in credit; physical cash cannot.
+    openingBalance: z.number().int().min(-AMOUNT_MAX).max(AMOUNT_MAX).default(0),
+    billingDay: billingDaySchema.nullable().optional(),
+    icon: iconSchema,
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === "cash" && value.openingBalance < 0) {
+      ctx.addIssue({ code: "custom", path: ["openingBalance"], message: "Cash balance can't be negative" });
+    }
+  });
 
 export const methodInputSchema = z.object({
   name: z.string().trim().min(1, "Name required").max(60),

@@ -30,6 +30,11 @@ export function todayIST(): string {
   return istFmt.format(new Date());
 }
 
+/** Convert an audit timestamp to the corresponding plain calendar date in IST. */
+export function dateInIST(value: Date): string {
+  return istFmt.format(value);
+}
+
 /** Parse a plain "yyyy-MM-dd" into a local Date at midnight (for date-fns math only). */
 export function parseDate(s: string): Date {
   return parse(s, "yyyy-MM-dd", new Date());
@@ -171,7 +176,7 @@ export function resolvePeriod(
   if (from && to && isValidDateStr(from) && isValidDateStr(to) && from <= to) {
     return { from, to };
   }
-  if (typeof sp.m === "string" && /^\d{4}-\d{2}$/.test(sp.m)) {
+  if (typeof sp.m === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(sp.m)) {
     const { start, end } = monthRange(sp.m);
     return { from: start, to: end };
   }

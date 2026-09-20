@@ -1,12 +1,29 @@
-import { getFilteredTransactions, getAccounts, getMethods, getCategories, getTitlesByKind } from "@/db/queries";
+import {
+  getFilteredTransactions,
+  getAccounts,
+  getMethods,
+  getCategories,
+  getTitlesByKind,
+  getEarliestTransactionDate,
+} from "@/db/queries";
 import { PeriodBar, PeriodTransition } from "@/components/period-bar";
 import { TransactionsView } from "./transactions-view";
 import { APP_NAME } from "@/lib/constants";
 import { todayIST, monthKey, resolvePeriod } from "@/lib/dates";
 import { heroTotal, isHeroCountable } from "@/lib/aggregations";
-import type { Transaction } from "@/lib/types";
+import { parseSearch, matchesNames, describeQuery } from "@/lib/search";
+import type { Transaction, TransactionType } from "@/lib/types";
 
 export const metadata = { title: `${APP_NAME} · Transactions` };
+
+const TYPES: TransactionType[] = ["expense", "cc_spend", "bill_pay", "transfer", "withdrawal", "income"];
+
+/** A positive integer id from a query param, or undefined for anything else. */
+function idParam(v: string | string[] | undefined): number | undefined {
+  if (typeof v !== "string") return undefined;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : undefined;
+}
 
 export default async function TransactionsPage({
   searchParams,
@@ -16,12 +33,19 @@ export default async function TransactionsPage({
   const sp = await searchParams;
   const today = todayIST();
   const nowMonth = monthKey(today);
-  const { from, to } = resolvePeriod(sp, today);
 
-  const type = typeof sp.type === "string" ? sp.type : undefined;
-  const methodId = typeof sp.method === "string" ? Number(sp.method) : undefined;
-  const categoryId = typeof sp.category === "string" ? Number(sp.category) : undefined;
-  const accountId = typeof sp.account === "string" ? Number(sp.account) : undefined;
+  // `all=1` (from the command palette) searches every date until a period is picked.
+  const hasExplicitRange = typeof sp.from === "string" && typeof sp.to === "string";
+  const allDates = sp.all === "1" && !hasExplicitRange;
+  const earliest = allDates ? await getEarliestTransactionDate() : null;
+  const { from, to } = allDates
+    ? { from: earliest && earliest < today ? earliest : today, to: today }
+    : resolvePeriod(sp, today);
+
+  const type = typeof sp.type === "string" && (TYPES as string[]).includes(sp.type) ? sp.type : undefined;
+  const methodId = idParam(sp.method);
+  const categoryId = idParam(sp.category);
+  const accountId = idParam(sp.account);
   const search = typeof sp.q === "string" ? sp.q : undefined;
 
   const [accounts, methods, categories, titlesByKind] = await Promise.all([
@@ -31,6 +55,11 @@ export default async function TransactionsPage({
     getTitlesByKind(),
   ]);
 
+  // Text search also matches method and category names, not just titles.
+  const parsed = parseSearch(search);
+  const nameMethodIds = methods.filter((m) => matchesNames(parsed, { method: m.name })).map((m) => m.id);
+  const nameCategoryIds = categories.filter((c) => matchesNames(parsed, { category: c.name })).map((c) => c.id);
+
   let txns = await getFilteredTransactions({
     from,
     to,
@@ -38,6 +67,8 @@ export default async function TransactionsPage({
     methodId,
     categoryId,
     search,
+    nameMethodIds,
+    nameCategoryIds,
   });
 
   if (accountId) {
@@ -66,6 +97,7 @@ export default async function TransactionsPage({
           today={today}
           titlesByKind={titlesByKind}
           filters={{ type, methodId, categoryId, accountId, search }}
+          queryLabel={describeQuery(parsed)}
         />
       </PeriodTransition>
     </main>

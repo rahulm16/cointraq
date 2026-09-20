@@ -1,7 +1,17 @@
 import "server-only";
 import { db } from "./client";
-import { accounts, paymentMethods, categories, transactions, snapshots, budgets, recurringTemplates } from "./schema";
-import { eq, asc, desc, and, or, gte, lte, ilike, type SQL } from "drizzle-orm";
+import {
+  accounts,
+  paymentMethods,
+  categories,
+  transactions,
+  snapshots,
+  budgets,
+  recurringTemplates,
+  appState,
+  txnTypeEnum,
+} from "./schema";
+import { eq, asc, desc, and, or, gte, lte, ilike, inArray, type SQL } from "drizzle-orm";
 import { parseSearch, isEmptyQuery } from "@/lib/search";
 import type {
   Account,
@@ -68,6 +78,15 @@ export async function getAccounts(includeArchived = true): Promise<Account[]> {
   return includeArchived ? mapped : mapped.filter((a) => !a.isArchived);
 }
 
+export async function getSetupCompleted(): Promise<boolean> {
+  const [row] = await db
+    .select({ setupCompleted: appState.setupCompleted })
+    .from(appState)
+    .where(eq(appState.id, 1))
+    .limit(1);
+  return row?.setupCompleted ?? false;
+}
+
 export async function getMethods(includeArchived = true): Promise<PaymentMethod[]> {
   const rows = await db
     .select()
@@ -102,9 +121,26 @@ export async function getTxnEffects(): Promise<TxnEffect[]> {
       fromAccountId: transactions.fromAccountId,
       toAccountId: transactions.toAccountId,
       categoryId: transactions.categoryId,
+      // Decides whether a transaction on a snapshot's own date came after it (lib/balances).
+      createdAt: transactions.createdAt,
     })
     .from(transactions);
   return rows as TxnEffect[];
+}
+
+/** Date of the oldest transaction, or null when the ledger is empty. */
+export async function getEarliestTransactionDate(): Promise<string | null> {
+  const rows = await db
+    .select({ date: transactions.date })
+    .from(transactions)
+    .orderBy(asc(transactions.date))
+    .limit(1);
+  return rows[0]?.date ?? null;
+}
+
+/** Escape LIKE wildcards so searching "50%" or "a_b" matches those characters literally. */
+function escapeLike(s: string): string {
+  return s.replace(/[\\%_]/g, (c) => `\\${c}`);
 }
 
 export interface TxnFilter {
@@ -119,6 +155,10 @@ export interface TxnFilter {
   accountId?: number;
   categoryId?: number;
   search?: string;
+  /** Methods whose name matches the search text — their transactions match too. */
+  nameMethodIds?: number[];
+  /** Categories whose name matches the search text — their transactions match too. */
+  nameCategoryIds?: number[];
 }
 
 /** Filtered transactions for the list. Combinable filters (SPEC §11). */
@@ -128,7 +168,10 @@ export async function getFilteredTransactions(f: TxnFilter): Promise<Transaction
   const end = f.to ?? f.monthEnd;
   if (start) conds.push(gte(transactions.date, start));
   if (end) conds.push(lte(transactions.date, end));
-  if (f.type) conds.push(eq(transactions.type, f.type as Transaction["type"]));
+  // An unknown type would make Postgres reject the enum comparison; ignore it instead.
+  if (f.type && (txnTypeEnum.enumValues as readonly string[]).includes(f.type)) {
+    conds.push(eq(transactions.type, f.type as Transaction["type"]));
+  }
   if (f.methodId) conds.push(eq(transactions.methodId, f.methodId));
   if (f.categoryId) conds.push(eq(transactions.categoryId, f.categoryId));
 
@@ -137,13 +180,14 @@ export async function getFilteredTransactions(f: TxnFilter): Promise<Transaction
   if (!isEmptyQuery(q)) {
     if (q.min !== null) conds.push(gte(transactions.amount, q.min));
     if (q.max !== null) conds.push(lte(transactions.amount, q.max));
-    if (q.amount !== null && q.text) {
-      // A bare number: match the amount OR the title, so "2024" finds both.
-      conds.push(
-        or(eq(transactions.amount, q.amount), ilike(transactions.title, `%${q.text}%`)) as SQL,
-      );
-    } else if (q.text) {
-      conds.push(ilike(transactions.title, `%${q.text}%`));
+    if (q.text) {
+      // The title, OR a method/category with that name, OR — for a bare number like
+      // "2024" — that exact amount.
+      const alts: SQL[] = [ilike(transactions.title, `%${escapeLike(q.text)}%`)];
+      if (q.amount !== null) alts.push(eq(transactions.amount, q.amount));
+      if (f.nameMethodIds?.length) alts.push(inArray(transactions.methodId, f.nameMethodIds));
+      if (f.nameCategoryIds?.length) alts.push(inArray(transactions.categoryId, f.nameCategoryIds));
+      conds.push(or(...alts) as SQL);
     }
   }
 

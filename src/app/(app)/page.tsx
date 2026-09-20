@@ -9,6 +9,7 @@ import {
   getBudgets,
   getRecurringTemplates,
   getQuickAddSuggestions,
+  getSetupCompleted,
 } from "@/db/queries";
 import { buildDashboard } from "@/lib/dashboard";
 import { monthKey, monthRange, resolvePeriod, shiftMonth, todayIST } from "@/lib/dates";
@@ -58,6 +59,7 @@ export default async function DashboardPage({
     allBudgets,
     templates,
     quickAdds,
+    setupCompleted,
   ] = await Promise.all([
     getAccounts(true),
     getMethods(true),
@@ -69,10 +71,12 @@ export default async function DashboardPage({
     getBudgets(),
     getRecurringTemplates(),
     getQuickAddSuggestions(),
+    getSetupCompleted(),
   ]);
 
-  // Budgets are a calendar-month concept; anchor them to the viewed period's month.
-  const viewMonth = monthKey(from);
+  // Budgets are a calendar-month concept; anchor them to the month the period ends in
+  // ("Last 30 days" on 10 Sep is about September, not August).
+  const viewMonth = monthKey(to);
   const budgets = monthBudgets(allBudgets, effects, viewMonth, today);
   const due = dueNow(templates, today);
   const insights = buildInsights({ effects, categories, methods, from, to, today });
@@ -85,7 +89,9 @@ export default async function DashboardPage({
   // First run: no transactions yet. Collect opening balances and a cap rather
   // than showing an empty dashboard — those two numbers are what make the first
   // reconcile and the pace ring meaningful.
-  if (effects.length === 0) {
+  // Once the user has reconciled or set a budget, an empty ledger (say, after deleting
+  // every transaction) is just an empty dashboard, not a fresh install.
+  if (effects.length === 0 && !setupCompleted) {
     return (
       <main className="max-w-[1120px] mx-auto p-4 lg:p-8">
         <FirstRun accounts={accounts.filter((a) => !a.isArchived)} month={monthKey(today)} />

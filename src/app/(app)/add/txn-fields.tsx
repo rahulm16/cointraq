@@ -301,11 +301,13 @@ export function AccountSelect({
   accounts,
   defaultId,
   placeholder,
+  onChange,
 }: {
   name: string;
   accounts: Account[];
   defaultId?: number | null;
   placeholder?: string;
+  onChange?: (value: string) => void;
 }) {
   const options = [
     ...(placeholder ? [{ value: "", label: placeholder }] : []),
@@ -317,6 +319,7 @@ export function AccountSelect({
       defaultValue={defaultId != null ? String(defaultId) : ""}
       options={options}
       placeholder={placeholder ?? "Select account"}
+      onChange={onChange}
     />
   );
 }

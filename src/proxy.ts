@@ -12,6 +12,8 @@ export async function proxy(request: NextRequest) {
     pathname === "/manifest.webmanifest" ||
     pathname === "/manifest.json" ||
     pathname === "/favicon.ico" ||
+    pathname === "/icon.svg" ||
+    pathname === "/apple-icon.svg" ||
     pathname.startsWith("/icons/") ||
     pathname.startsWith("/_next/");
 

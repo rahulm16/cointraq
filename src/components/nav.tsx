@@ -25,6 +25,7 @@ import { APP_NAME } from "@/lib/constants";
 import { CointraqLogo } from "@/components/cointraq-logo";
 import { SPRING } from "@/lib/motion";
 import { logout } from "@/actions/auth";
+import { rememberAddReturnPath } from "@/lib/add-navigation";
 
 interface NavItem {
   href: string;
@@ -115,6 +116,7 @@ export function Sidebar() {
         <RailTooltip label="Add transaction" enabled={!expanded}>
           <Link
             href="/add"
+            onClick={rememberAddReturnPath}
             aria-label="Add transaction"
             className={cn(
               "flex items-center justify-center bg-primary text-primary-contrast pressable rounded-full",
@@ -279,6 +281,7 @@ export function Dock() {
         ))}
         <Link
           href="/add"
+          onClick={rememberAddReturnPath}
           aria-label="Add transaction"
           className="w-14 h-14 mx-1 rounded-full bg-primary text-primary-contrast flex items-center justify-center shadow-[var(--shadow-hero)] pressable"
         >

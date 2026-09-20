@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowRight, Check, Wallet, Landmark, Target } from "lucide-react";
 import type { Account } from "@/lib/types";
-import { setOpeningBalances } from "@/actions/accounts";
+import { completeSetup, setOpeningBalances } from "@/actions/accounts";
 import { setBudget } from "@/actions/budgets";
 import { formatINR } from "@/lib/money";
 import { useToast } from "@/components/toast";
@@ -12,6 +12,7 @@ import { TextInput } from "@/components/form";
 import { Card, Eyebrow, Avatar } from "@/components/ui";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { cn } from "@/lib/ui";
+import { rememberAddReturnPath } from "@/lib/add-navigation";
 
 /**
  * First-run setup. The seed already creates accounts, methods and categories, so
@@ -42,7 +43,8 @@ export function Onboarding({
 
   const saveBalances = () => {
     const entries = Object.entries(balances)
-      .map(([id, v]) => ({ accountId: Number(id), openingBalance: Number(v.replace(/[^\d]/g, "") || 0) }))
+      // A lone "-" parses to NaN and is dropped by the filter below.
+      .map(([id, v]) => ({ accountId: Number(id), openingBalance: v === "" ? 0 : Number(v) }))
       .filter((e) => Number.isFinite(e.openingBalance));
 
     startTransition(async () => {
@@ -66,6 +68,11 @@ export function Onboarding({
           show(res.message ?? "Could not save budget", { tone: "error" });
           return;
         }
+      }
+      const completed = await completeSetup();
+      if (!completed.ok) {
+        show(completed.message ?? "Could not finish setup", { tone: "error" });
+        return;
       }
       show("You're all set", { tone: "success" });
       onDone();
@@ -114,12 +121,13 @@ export function Onboarding({
                         aria-label={`Balance in ${a.name}`}
                         placeholder="0"
                         value={balances[a.id] ?? ""}
-                        onChange={(e) =>
-                          setBalances((prev) => ({
-                            ...prev,
-                            [a.id]: e.currentTarget.value.replace(/[^\d]/g, ""),
-                          }))
-                        }
+                        onChange={(e) => {
+                          // Digits with an optional leading minus — an overdrawn account is real.
+                          const raw = e.currentTarget.value;
+                          const digits = raw.replace(/[^\d]/g, "");
+                          const value = raw.trim().startsWith("-") ? `-${digits}` : digits;
+                          setBalances((prev) => ({ ...prev, [a.id]: value }));
+                        }}
                         className="w-32 !pl-6 text-right"
                       />
                     </div>
@@ -129,7 +137,16 @@ export function Onboarding({
 
               <div className="flex items-center gap-2 mt-5">
                 <button
-                  onClick={onDone}
+                  onClick={() => {
+                    startTransition(async () => {
+                      const completed = await completeSetup();
+                      if (!completed.ok) {
+                        show(completed.message ?? "Could not finish setup", { tone: "error" });
+                        return;
+                      }
+                      onDone();
+                    });
+                  }}
                   className="h-11 px-4 rounded-control text-[13.5px] font-medium text-text-faint"
                 >
                   Skip
@@ -238,6 +255,7 @@ export function FirstRun({ accounts, month }: { accounts: Account[]; month: stri
         </p>
         <a
           href="/add"
+          onClick={rememberAddReturnPath}
           className="inline-flex items-center gap-1.5 mt-4 h-11 px-4 rounded-control bg-primary text-primary-contrast font-semibold text-[14px]"
         >
           Log a spend <ArrowRight size={15} strokeWidth={2.25} />

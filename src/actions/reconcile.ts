@@ -14,7 +14,8 @@ import { AMOUNT_MAX } from "@/lib/constants";
 
 const entrySchema = z.object({
   accountId: z.number().int().positive(),
-  actual: z.number().int().min(0).max(AMOUNT_MAX),
+  // Negative is real: an overdrawn account.
+  actual: z.number().int().min(-AMOUNT_MAX).max(AMOUNT_MAX),
 });
 
 /**
@@ -58,6 +59,7 @@ export async function saveSnapshots(_prev: ActionResult, form: FormData): Promis
         fromAccountId: transactions.fromAccountId,
         toAccountId: transactions.toAccountId,
         categoryId: transactions.categoryId,
+        createdAt: transactions.createdAt,
       })
       .from(transactions),
   ]);
@@ -72,6 +74,13 @@ export async function saveSnapshots(_prev: ActionResult, form: FormData): Promis
   })) as Snapshot[];
 
   const accById = new Map(accs.map((a) => [a.id, a as unknown as Account]));
+
+  for (const entry of entries) {
+    const acc = accById.get(entry.accountId);
+    if (acc?.type === "cash" && entry.actual < 0) {
+      return errResult({ [`actual_${entry.accountId}`]: "Cash balance can't be negative" });
+    }
+  }
 
   const rows = entries
     .map((e) => {

@@ -5,6 +5,9 @@ import { dateLte } from "./dates";
 /**
  * The most recent snapshot on/before asOf for an account becomes its baseline;
  * otherwise opening_balance with a −∞ (null) date.  SPEC §5.
+ *
+ * The baseline is the ACTUAL balance the user counted — reconciling resets the
+ * ledger to reality. The frozen expected value is kept only for history.
  */
 export function baselineFor(account: Account, asOf: string, snapshots: Snapshot[]): Baseline {
   let best: Snapshot | null = null;
@@ -15,7 +18,9 @@ export function baselineFor(account: Account, asOf: string, snapshots: Snapshot[
       best = s;
     }
   }
-  return best ? { value: best.expectedBalance, date: best.date } : { value: account.openingBalance, date: null };
+  return best
+    ? { value: best.actualBalance, date: best.date, createdAt: best.createdAt }
+    : { value: account.openingBalance, date: null, createdAt: null };
 }
 
 /** Expected balance for one account as of a date, using snapshots as baselines. */

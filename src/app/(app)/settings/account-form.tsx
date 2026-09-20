@@ -58,7 +58,6 @@ export function AccountForm({ account, onDone }: { account: Account | null; onDo
           name="openingBalance"
           numeric
           type="number"
-          min={0}
           defaultValue={account?.openingBalance ?? 0}
         />
       </Field>

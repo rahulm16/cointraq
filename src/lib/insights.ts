@@ -1,6 +1,17 @@
 import type { Category, PaymentMethod, TxnEffect } from "./types";
 import { heroForMonth, heroForRange, categoryBreakdownRange, byMethodRange, isHeroCountable } from "./aggregations";
-import { daysInRange, inDateRange, monthKey, shiftMonth, formatDayShort } from "./dates";
+import {
+  daysInRange,
+  inDateRange,
+  isFullMonthRange,
+  monthKey,
+  monthRange,
+  parseDate,
+  shiftMonth,
+  toDateStr,
+  formatDayShort,
+} from "./dates";
+import { subMonths } from "date-fns";
 
 /**
  * Insight cards — observations derived from data the dashboard already loads.
@@ -37,23 +48,43 @@ export interface InsightInput {
   today: string;
 }
 
-/** Category spending in this period vs its average over the preceding N months. */
-function categoryTrend(input: InsightInput): Insight | null {
-  const { effects, categories, from, to } = input;
-  const mk = monthKey(from);
-  const history = [1, 2, 3].map((i) => shiftMonth(mk, -i));
+/**
+ * The same slice of an earlier period, `i` months back, so a comparison is always
+ * like-for-like: a finished month against whole earlier months, a month in
+ * progress against the same first N days of earlier months, and any other range
+ * against the same dates shifted back.
+ */
+function earlierWindow(from: string, end: string, to: string, i: number): { from: string; to: string } {
+  if (isFullMonthRange({ from, to })) {
+    const { start, end: monthEnd } = monthRange(shiftMonth(monthKey(from), -i));
+    if (end === to) return { from: start, to: monthEnd };
+    const cut = `${start.slice(0, 8)}${end.slice(8, 10)}`;
+    return { from: start, to: cut < monthEnd ? cut : monthEnd };
+  }
+  return {
+    from: toDateStr(subMonths(parseDate(from), i)),
+    to: toDateStr(subMonths(parseDate(end), i)),
+  };
+}
 
-  const { byCategory } = categoryBreakdownRange(effects, from, to);
+/** Category spending in this period vs the same slice of the preceding 3 months. */
+function categoryTrend(input: InsightInput): Insight | null {
+  const { effects, categories, from, to, today } = input;
+  // Only days that have happened count — a month in progress isn't a whole month.
+  const end = to < today ? to : today;
+  if (end < from) return null;
+
+  const { byCategory } = categoryBreakdownRange(effects, from, end);
+  const history = [1, 2, 3].map((i) => {
+    const w = earlierWindow(from, end, to, i);
+    return categoryBreakdownRange(effects, w.from, w.to).byCategory;
+  });
 
   let best: Insight | null = null;
   for (const [cid, current] of byCategory) {
     if (cid === null || current < MIN_MEANINGFUL_AMOUNT) continue;
 
-    const past = history.map((m) => {
-      const { byCategory: b } = categoryBreakdownRange(effects, `${m}-01`, `${m}-31`);
-      return b.get(cid) ?? 0;
-    });
-    const months = past.filter((p) => p > 0);
+    const months = history.map((b) => b.get(cid) ?? 0).filter((p) => p > 0);
     if (months.length < MIN_HISTORY_MONTHS) continue;
 
     const avg = months.reduce((a, b) => a + b, 0) / months.length;
@@ -154,10 +185,12 @@ function biggestSpend(input: InsightInput): Insight | null {
   };
 }
 
-/** Month-over-month direction, stated as a streak when it holds. */
+/** Month-over-month direction across finished months, stated as a streak when it holds. */
 function monthStreak(input: InsightInput): Insight | null {
-  const { effects, from } = input;
-  const mk = monthKey(from);
+  const { effects, from, today } = input;
+  // A month still in progress would always look like a fall — start from the last finished one.
+  let mk = monthKey(from);
+  if (monthRange(mk).end >= today) mk = shiftMonth(mk, -1);
   const totals = [0, 1, 2, 3].map((i) => heroForMonth(effects, shiftMonth(mk, -i)));
   if (totals.slice(1).every((t) => t === 0)) return null;
 

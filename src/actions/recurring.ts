@@ -3,18 +3,21 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { recurringTemplates, transactions, accounts, paymentMethods } from "@/db/schema";
+import { recurringTemplates, transactions, accounts, paymentMethods, categories } from "@/db/schema";
 import { recurringInputSchema, fieldErrors } from "@/lib/validation";
 import { requireAuth, okResult, errResult, type ActionResult } from "./shared";
-import { deriveSpendType, categoryAllowed } from "@/lib/txn-rules";
-import { todayIST } from "@/lib/dates";
+import { normalizeTxn, ruleLookups, type RuleLookups, type TxnShape } from "@/lib/txn-rules";
+import { shiftDate, todayIST } from "@/lib/dates";
 import { currentOccurrence } from "@/lib/recurring";
-import type { AccountType } from "@/lib/types";
 
 /*
   Recurring templates never write transactions on their own — there is no cron and
   no background job. `logFromTemplate` is always user-initiated, and stamps
   `lastLoggedDate` so the occurrence stops showing as due.
+
+  Every template goes through the same transaction rules as the Add form
+  (lib/txn-rules) when it is saved AND when it is logged, since accounts can be
+  archived or re-linked in between.
 */
 
 function num(form: FormData, key: string): number | null {
@@ -42,6 +45,38 @@ function parseTemplateForm(formData: FormData) {
   });
 }
 
+type TemplateInput = NonNullable<ReturnType<typeof parseTemplateForm>["data"]>;
+
+async function loadRuleLookups(): Promise<RuleLookups> {
+  const [accs, meths, cats] = await Promise.all([
+    db
+      .select({ id: accounts.id, type: accounts.type, isArchived: accounts.isArchived, sortOrder: accounts.sortOrder })
+      .from(accounts),
+    db
+      .select({ id: paymentMethods.id, accountId: paymentMethods.accountId, isArchived: paymentMethods.isArchived })
+      .from(paymentMethods),
+    db.select({ id: categories.id, isArchived: categories.isArchived }).from(categories),
+  ]);
+  return ruleLookups(accs, meths, cats);
+}
+
+/** Validate a template's money fields; returns the cleaned ids or a form error. */
+async function checkTemplate(d: TemplateInput): Promise<{ ok: true; shape: TxnShape } | { ok: false; result: ActionResult }> {
+  const ruled = normalizeTxn(
+    {
+      type: d.type,
+      categoryId: d.categoryId ?? null,
+      methodId: d.methodId ?? null,
+      fromAccountId: d.fromAccountId ?? null,
+      toAccountId: d.toAccountId ?? null,
+      incomeSource: d.incomeSource ?? null,
+    },
+    await loadRuleLookups(),
+  );
+  if (!ruled.ok) return { ok: false, result: errResult({ [ruled.field]: ruled.message }) };
+  return { ok: true, shape: ruled.txn };
+}
+
 function revalidateRecurring() {
   revalidatePath("/");
   revalidatePath("/settings");
@@ -54,19 +89,26 @@ export async function createRecurring(_prev: ActionResult, formData: FormData): 
   if (!parsed.success) return errResult(fieldErrors(parsed.error));
 
   const d = parsed.data;
+  const checked = await checkTemplate(d);
+  if (!checked.ok) return checked.result;
+  const s = checked.shape;
+
   await db.insert(recurringTemplates).values({
     title: d.title,
+    // Keep the form's type ("expense"); the card-vs-bank split is derived at log time.
     type: d.type,
     amount: d.amount,
-    categoryId: categoryAllowed(d.type) ? (d.categoryId ?? null) : null,
-    methodId: d.methodId ?? null,
-    fromAccountId: d.fromAccountId ?? null,
-    toAccountId: d.toAccountId ?? null,
-    incomeSource: d.type === "income" ? (d.incomeSource ?? null) : null,
+    categoryId: s.categoryId,
+    methodId: s.methodId,
+    fromAccountId: s.fromAccountId,
+    toAccountId: s.toAccountId,
+    incomeSource: s.incomeSource,
     recurrence: d.recurrence,
     dayOfMonth: d.dayOfMonth ?? null,
     dayOfWeek: d.dayOfWeek ?? null,
     monthOfYear: d.monthOfYear ?? null,
+    // Count from today: an occurrence that passed before the template existed isn't overdue.
+    lastLoggedDate: shiftDate(todayIST(), -1),
   });
 
   revalidateRecurring();
@@ -82,17 +124,21 @@ export async function updateRecurring(_prev: ActionResult, formData: FormData): 
   if (!parsed.success) return errResult(fieldErrors(parsed.error));
 
   const d = parsed.data;
+  const checked = await checkTemplate(d);
+  if (!checked.ok) return checked.result;
+  const s = checked.shape;
+
   await db
     .update(recurringTemplates)
     .set({
       title: d.title,
       type: d.type,
       amount: d.amount,
-      categoryId: categoryAllowed(d.type) ? (d.categoryId ?? null) : null,
-      methodId: d.methodId ?? null,
-      fromAccountId: d.fromAccountId ?? null,
-      toAccountId: d.toAccountId ?? null,
-      incomeSource: d.type === "income" ? (d.incomeSource ?? null) : null,
+      categoryId: s.categoryId,
+      methodId: s.methodId,
+      fromAccountId: s.fromAccountId,
+      toAccountId: s.toAccountId,
+      incomeSource: s.incomeSource,
       recurrence: d.recurrence,
       dayOfMonth: d.dayOfMonth ?? null,
       dayOfWeek: d.dayOfWeek ?? null,
@@ -107,9 +153,21 @@ export async function updateRecurring(_prev: ActionResult, formData: FormData): 
 
 export async function setRecurringArchived(id: number, archived: boolean): Promise<ActionResult> {
   await requireAuth();
+  const [t] = await db
+    .select({ lastLoggedDate: recurringTemplates.lastLoggedDate })
+    .from(recurringTemplates)
+    .where(eq(recurringTemplates.id, id))
+    .limit(1);
+  if (!t) return errResult({ _: "Not found" }, "Recurring item not found");
+
+  // Resuming starts fresh from today, so the paused months don't all come back as overdue.
+  const resumeFrom = shiftDate(todayIST(), -1);
+  const lastLoggedDate =
+    !archived && (t.lastLoggedDate == null || t.lastLoggedDate < resumeFrom) ? resumeFrom : t.lastLoggedDate;
+
   await db
     .update(recurringTemplates)
-    .set({ isArchived: archived, updatedAt: new Date() })
+    .set({ isArchived: archived, lastLoggedDate, updatedAt: new Date() })
     .where(eq(recurringTemplates.id, id));
   revalidateRecurring();
   return okResult(archived ? "Paused" : "Resumed");
@@ -128,9 +186,9 @@ export async function deleteRecurring(id: number): Promise<ActionResult> {
  * the dashboard's Due strip.
  *
  * `amountOverride` lets a variable bill (an EMI that changed, a higher electricity
- * bill) be corrected at log time without editing the template. The spend type is
- * re-derived from the method exactly as the Add form does (SPEC §4 rule 1), so a
- * template pointing at a credit-card method correctly logs `cc_spend`.
+ * bill) be corrected at log time without editing the template. The transaction is
+ * rebuilt with the same rules as the Add form (SPEC §4): a template pointing at a
+ * credit-card method logs `cc_spend`, and a withdrawal lands in the cash account.
  */
 export async function logFromTemplate(
   id: number,
@@ -150,39 +208,32 @@ export async function logFromTemplate(
   const amount = opts?.amountOverride ?? t.amount;
   if (!Number.isInteger(amount) || amount < 1) return errResult({ amount: "Invalid amount" });
 
-  // Re-derive expense vs cc_spend from the method's account type.
-  let type = t.type;
-  if (t.type === "expense" && t.methodId != null) {
-    const [m] = await db
-      .select({ accountId: paymentMethods.accountId })
-      .from(paymentMethods)
-      .where(eq(paymentMethods.id, t.methodId))
-      .limit(1);
-    if (m) {
-      const [a] = await db
-        .select({ type: accounts.type })
-        .from(accounts)
-        .where(eq(accounts.id, m.accountId))
-        .limit(1);
-      if (a) type = deriveSpendType(a.type as AccountType);
-    }
+  const ruled = normalizeTxn(
+    {
+      type: t.type,
+      categoryId: t.categoryId,
+      methodId: t.methodId,
+      fromAccountId: t.fromAccountId,
+      toAccountId: t.toAccountId,
+      incomeSource: t.incomeSource,
+    },
+    await loadRuleLookups(),
+  );
+  if (!ruled.ok) {
+    return errResult(
+      { [ruled.field]: ruled.message },
+      `Can't log ${t.title}: ${ruled.message.toLowerCase()}. Edit it in Settings.`,
+    );
   }
 
-  await db.insert(transactions).values({
-    type,
-    amount,
-    date: safeDate,
-    title: t.title,
-    categoryId: categoryAllowed(type) ? t.categoryId : null,
-    methodId: t.methodId,
-    fromAccountId: t.fromAccountId,
-    toAccountId: t.toAccountId,
-    incomeSource: type === "income" ? t.incomeSource : null,
-  });
+  await db.insert(transactions).values({ ...ruled.txn, amount, date: safeDate, title: t.title });
 
+  // Mark the OCCURRENCE handled, not the clamped log date: logging a few days early
+  // would otherwise leave lastLoggedDate before the due date and offer it again.
+  const handled = t.lastLoggedDate && t.lastLoggedDate > date ? t.lastLoggedDate : date;
   await db
     .update(recurringTemplates)
-    .set({ lastLoggedDate: safeDate, updatedAt: new Date() })
+    .set({ lastLoggedDate: handled, updatedAt: new Date() })
     .where(eq(recurringTemplates.id, id));
 
   revalidateRecurring();

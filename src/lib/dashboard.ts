@@ -11,9 +11,11 @@ import {
 } from "./aggregations";
 import { accountExpected } from "./compute";
 import { cardStatement, type CardStatement } from "./statement";
-import { methodAccountLookup } from "./balances";
+import { ccOutstanding, methodAccountLookup } from "./balances";
+import { activeCashAccountId } from "./txn-rules";
 import {
   monthKey,
+  monthRange,
   parseDate,
   previousEqualRange,
   shiftMonth,
@@ -49,6 +51,17 @@ export interface DashboardData {
   recent: Transaction[];
 }
 
+/**
+ * The window the hero delta compares against. A full calendar month is compared
+ * with the whole previous month — "than last month" has to mean last month — and
+ * any other range with the equal-length window just before it.
+ */
+export function comparisonRange(range: DateRange): DateRange {
+  if (!isFullMonthRange(range)) return previousEqualRange(range);
+  const { start, end } = monthRange(shiftMonth(monthKey(range.from), -1));
+  return { from: start, to: end };
+}
+
 /** Compute everything the dashboard shows for a date range. */
 export function buildDashboard(input: {
   from: string;
@@ -63,14 +76,16 @@ export function buildDashboard(input: {
   const { from, to, accounts, methods, categories, effects, snapshots, recent } = input;
   const range: DateRange = { from, to };
   const today = todayIST();
-  const prev = previousEqualRange(range);
+  const prev = comparisonRange(range);
   const catName = (id: number | null) => categories.find((c) => c.id === id)?.name ?? "Uncategorized";
   const catColor = (id: number | null) => categories.find((c) => c.id === id)?.color ?? null;
 
   const hero = heroForRange(effects, from, to);
   const delta = heroDeltaForRange(effects, from, to, prev.from, prev.to);
 
-  const cashAccount = accounts.find((a) => a.type === "cash");
+  // The same cash account withdrawals land in.
+  const cashId = activeCashAccountId(accounts);
+  const cashAccount = accounts.find((a) => a.id === cashId);
   const cashInHand = cashAccount
     ? accountExpected(cashAccount, today, effects, snapshots, methods)
     : null;
@@ -102,8 +117,11 @@ export function buildDashboard(input: {
       const cycleBreakdown = [...bd.entries()]
         .map(([cid, total]) => ({ name: catName(cid), total, color: (catColor(cid) ?? "blue") as CategoryColor }))
         .sort((a, b) => b.total - a.total);
-      return { account: card, statement, cycleBreakdown };
-    });
+      const outstanding = ccOutstanding(card, today, cardTxns, lookup);
+      return { account: card, statement, cycleBreakdown, outstanding };
+    })
+    // Archived cards drop off only when their complete all-time ledger is settled.
+    .filter((c) => !c.account.isArchived || c.outstanding !== 0);
 
   const daily = dailyHeroRange(effects, from, to);
   const dailyBars = fillDays(from, to, daily);

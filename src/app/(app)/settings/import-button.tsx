@@ -88,6 +88,13 @@ export function ImportButton() {
               </div>
             </div>
 
+            {preview.duplicateCount > 0 && (
+              <p className="text-[12px] text-text-secondary">
+                {preview.duplicateCount} row{preview.duplicateCount === 1 ? " is" : "s are"} already in your
+                ledger and will be skipped, so nothing is added twice.
+              </p>
+            )}
+
             <UnknownNames
               label="Categories not found"
               names={preview.unknownCategories}

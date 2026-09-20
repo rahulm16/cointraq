@@ -36,6 +36,7 @@ export function TransactionsView({
   today,
   titlesByKind,
   filters,
+  queryLabel,
 }: {
   transactions: Transaction[];
   accounts: Account[];
@@ -51,6 +52,8 @@ export function TransactionsView({
     accountId?: number;
     search?: string;
   };
+  /** Human description of the parsed search ("₹100–₹500"), if any. */
+  queryLabel?: string | null;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -63,6 +66,19 @@ export function TransactionsView({
   // Bulk selection. Entering select mode swaps row taps from "edit" to "select".
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
+
+  // A filter or search change shows different rows, and this component isn't
+  // remounted for it — a selection made on the old list must not carry over.
+  const filterKey = params.toString();
+  const [selectionKey, setSelectionKey] = useState(filterKey);
+  if (selectionKey !== filterKey) {
+    setSelectionKey(filterKey);
+    setSelected([]);
+    setSelectMode(false);
+  }
+  // And only ever act on rows that are actually on screen.
+  const visibleIds = useMemo(() => new Set(transactions.map((t) => t.id)), [transactions]);
+  const actionable = selected.filter((id) => visibleIds.has(id));
 
   const toggleSelect = (id: number) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -77,6 +93,8 @@ export function TransactionsView({
     const p = new URLSearchParams(params.toString());
     if (value === undefined || value === "") p.delete(key);
     else p.set(key, value);
+    // Clearing the search also ends an "all dates" search from the command palette.
+    if (key === "q" && !value) p.delete("all");
     router.push(`${pathname}?${p.toString()}`);
   }
 
@@ -170,6 +188,7 @@ export function TransactionsView({
       <div className={cn("flex items-center justify-between px-3 py-2.5 rounded-control", CHROME)}>
         <span className="text-[12.5px] tnum font-medium text-text-primary">
           {summary.count} transaction{summary.count === 1 ? "" : "s"}
+          {queryLabel && <span className="font-normal text-text-secondary"> · {queryLabel}</span>}
         </span>
         <div className="flex items-center gap-3">
           <span className="text-[12.5px] font-medium text-text-primary">
@@ -294,7 +313,7 @@ export function TransactionsView({
         onCancel={() => setConfirming(null)}
       />
 
-      <BulkBar selected={selected} categories={categories} onClear={exitSelect} />
+      <BulkBar selected={actionable} categories={categories} onClear={exitSelect} />
     </div>
   );
 }

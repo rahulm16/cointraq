@@ -28,8 +28,11 @@ export function DueStrip({
   categories: Category[];
   methods: PaymentMethod[];
 }) {
-  const [done, setDone] = useState<Set<number>>(new Set());
-  const visible = items.filter((i) => !done.has(i.template.id));
+  // Keyed by occurrence, not template: once one is handled, the same template's
+  // next overdue occurrence (e.g. last month's missed rent) must still show.
+  const [done, setDone] = useState<Set<string>>(new Set());
+  const keyOf = (i: DueItem) => `${i.template.id}:${i.dueDate}`;
+  const visible = items.filter((i) => !done.has(keyOf(i)));
 
   if (visible.length === 0) return null;
 
@@ -54,7 +57,7 @@ export function DueStrip({
                 item={item}
                 categories={categories}
                 methods={methods}
-                onResolved={() => setDone((prev) => new Set(prev).add(item.template.id))}
+                onResolved={() => setDone((prev) => new Set(prev).add(keyOf(item)))}
               />
             </motion.div>
           ))}

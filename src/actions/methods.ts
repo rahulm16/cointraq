@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq, sql, and, ne } from "drizzle-orm";
 import { db } from "@/db/client";
-import { paymentMethods, accounts } from "@/db/schema";
+import { paymentMethods, accounts, transactions } from "@/db/schema";
 import { methodInputSchema, fieldErrors } from "@/lib/validation";
 import { requireAuth, okResult, errResult, type ActionResult } from "./shared";
 
@@ -56,6 +56,28 @@ export async function updateMethod(_prev: ActionResult, formData: FormData): Pro
     return errResult({ accountId: "Pick an account" });
   }
 
+  const [existing] = await db
+    .select({ accountId: paymentMethods.accountId })
+    .from(paymentMethods)
+    .where(eq(paymentMethods.id, id))
+    .limit(1);
+  if (!existing) return errResult({ _: "This method no longer exists" });
+
+  // Past spends are attributed to the method's CURRENT account, so moving a method
+  // that has history would silently rewrite old balances and card statements.
+  if (existing.accountId !== data.accountId) {
+    const used = await db
+      .select({ id: transactions.id })
+      .from(transactions)
+      .where(eq(transactions.methodId, id))
+      .limit(1);
+    if (used.length > 0) {
+      return errResult({
+        accountId: "This method has transactions, so its account can't change. Archive it and add a new method instead.",
+      });
+    }
+  }
+
   await db
     .update(paymentMethods)
     .set({ name: data.name, accountId: data.accountId, icon: data.icon ?? null })
@@ -71,6 +93,17 @@ export async function updateMethod(_prev: ActionResult, formData: FormData): Pro
  */
 export async function setDefaultMethod(id: number): Promise<ActionResult> {
   await requireAuth();
+  // Unsetting first would leave no default at all if the target is gone or archived.
+  const [target] = await db
+    .select({ isArchived: paymentMethods.isArchived })
+    .from(paymentMethods)
+    .where(eq(paymentMethods.id, id))
+    .limit(1);
+  if (!target || target.isArchived) {
+    const message = "That method is archived or no longer exists";
+    return errResult({ _: message }, message);
+  }
+
   await db.transaction(async (tx) => {
     await tx
       .update(paymentMethods)
@@ -93,7 +126,8 @@ export async function setMethodArchived(id: number, archived: boolean): Promise<
       .where(eq(paymentMethods.id, id))
       .limit(1);
     if (rows[0]?.isDefault) {
-      return errResult({ _: "Make another method default before archiving this one." });
+      const message = "Make another method default before archiving this one.";
+      return errResult({ _: message }, message);
     }
   }
   await db.update(paymentMethods).set({ isArchived: archived }).where(eq(paymentMethods.id, id));

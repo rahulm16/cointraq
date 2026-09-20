@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { splitCsvLine, parseTransactionsCsv } from "./csv-import";
+import { splitCsvLine, parseTransactionsCsv, dropExisting } from "./csv-import";
 import { buildCsvs } from "./csv";
 import type { Account, Category, PaymentMethod, Transaction } from "./types";
 
@@ -152,5 +152,79 @@ describe("parseTransactionsCsv", () => {
     expect(r.rows).toHaveLength(2);
     expect(r.rows[0].title).toBe('chai, "the good one"'); // quoting survived
     expect(r.rows[1]).toMatchObject({ type: "income", toAccountId: 1, incomeSource: "salary" });
+  });
+});
+
+describe("import applies the Add form's rules", () => {
+  const header = "date,type,amount,title,category,method,from_account,to_account,income_source";
+  const cardRef = {
+    ...ref,
+    methods: [
+      ...methods,
+      { id: 12, name: "Card", accountId: 3, icon: null, isDefault: false, isArchived: false, sortOrder: 2, createdAt: new Date() },
+    ],
+  };
+
+  it("derives cc_spend from a credit-card method", () => {
+    const r = parseTransactionsCsv(`${header}\n2026-07-05,expense,900,dinner,Food,Card,,,`, cardRef, TODAY);
+    expect(r.rows[0].type).toBe("cc_spend");
+  });
+
+  it("sends a withdrawal to the cash account", () => {
+    const r = parseTransactionsCsv(`${header}\n2026-07-05,withdrawal,5000,ATM,,,HDFC Bank,,`, ref, TODAY);
+    expect(r.rows[0].toAccountId).toBe(2);
+  });
+
+  it("rejects a bill payment into a non-card account", () => {
+    const r = parseTransactionsCsv(`${header}\n2026-07-05,bill_pay,9000,bill,,GPay,,HDFC Bank,`, ref, TODAY);
+    expect(r.rows).toHaveLength(0);
+    expect(r.errors[0].message).toMatch(/credit card/);
+  });
+
+  it("keeps a quoted title with a line break in one row", () => {
+    const r = parseTransactionsCsv(`${header}\n2026-07-05,expense,240,"chai\nand snacks",Food,GPay,,,`, ref, TODAY);
+    expect(r.errors).toHaveLength(0);
+    expect(r.rows[0].title).toBe("chai\nand snacks");
+  });
+});
+
+describe("dropExisting", () => {
+  it("keeps identical rows when the CSV has no exported identity", () => {
+    const row = {
+      sourceId: null,
+      sourceCreatedAt: null,
+      date: "2026-07-05",
+      type: "expense" as const,
+      amount: 40,
+      title: "chai",
+      categoryId: 20,
+      methodId: 10,
+      fromAccountId: null,
+      toAccountId: null,
+      incomeSource: null,
+    };
+    const { rows, duplicates } = dropExisting([row], [{ ...row, id: 1, createdAt: new Date() }]);
+    expect(duplicates).toBe(0);
+    expect(rows).toHaveLength(1);
+  });
+
+  it("skips only a row with the same exported id and creation timestamp", () => {
+    const createdAt = new Date("2026-07-05T08:00:00.000Z");
+    const row = {
+      sourceId: 7,
+      sourceCreatedAt: createdAt.toISOString(),
+      date: "2026-07-05",
+      type: "expense" as const,
+      amount: 40,
+      title: "chai",
+      categoryId: 20,
+      methodId: 10,
+      fromAccountId: null,
+      toAccountId: null,
+      incomeSource: null,
+    };
+    const { rows, duplicates } = dropExisting([row], [{ ...row, id: 7, createdAt }]);
+    expect(duplicates).toBe(1);
+    expect(rows).toHaveLength(0);
   });
 });

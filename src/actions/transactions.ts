@@ -1,10 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db/client";
-import { transactions, accounts, paymentMethods } from "@/db/schema";
+import { transactions, accounts, paymentMethods, categories } from "@/db/schema";
 import { requireAuth, okResult, errResult, type ActionResult } from "./shared";
 import { amountSchema, dateSchema, titleSchema, incomeSourceSchema, fieldErrors } from "@/lib/validation";
 import { todayIST } from "@/lib/dates";
@@ -28,20 +28,36 @@ interface Lookups {
   methodAccountType: Map<number, AccountType>;
   methodAccountId: Map<number, number>;
   methodName: Map<number, string>;
+  categoryIds: Set<number>;
 }
 
-async function loadLookups(): Promise<Lookups> {
-  const accs = await db.select({ id: accounts.id, type: accounts.type }).from(accounts);
+async function loadLookups(allow?: {
+  accountIds?: number[];
+  methodId?: number | null;
+  categoryId?: number | null;
+}): Promise<Lookups> {
+  const accs = await db.select({ id: accounts.id, type: accounts.type, isArchived: accounts.isArchived }).from(accounts);
   const meths = await db
-    .select({ id: paymentMethods.id, accountId: paymentMethods.accountId, name: paymentMethods.name })
+    .select({ id: paymentMethods.id, accountId: paymentMethods.accountId, name: paymentMethods.name, isArchived: paymentMethods.isArchived })
     .from(paymentMethods);
-  const accountType = new Map(accs.map((a) => [a.id, a.type]));
-  const methodAccountId = new Map(meths.map((m) => [m.id, m.accountId]));
-  const methodAccountType = new Map(
-    meths.map((m) => [m.id, accountType.get(m.accountId) ?? ("bank" as AccountType)]),
+  const cats = await db.select({ id: categories.id, isArchived: categories.isArchived }).from(categories);
+  const allowedAccounts = new Set(allow?.accountIds ?? []);
+  const existingMethodAccount = meths.find((m) => m.id === allow?.methodId)?.accountId;
+  if (existingMethodAccount != null) allowedAccounts.add(existingMethodAccount);
+  const usableAccounts = accs.filter((a) => !a.isArchived || allowedAccounts.has(a.id));
+  const accountType = new Map(usableAccounts.map((a) => [a.id, a.type]));
+  const usableMethods = meths.filter(
+    (m) => (!m.isArchived || m.id === allow?.methodId) && accountType.has(m.accountId),
   );
-  const methodName = new Map(meths.map((m) => [m.id, m.name]));
-  return { accountType, methodAccountType, methodAccountId, methodName };
+  const methodAccountId = new Map(usableMethods.map((m) => [m.id, m.accountId]));
+  const methodAccountType = new Map(
+    usableMethods.map((m) => [m.id, accountType.get(m.accountId)!]),
+  );
+  const methodName = new Map(usableMethods.map((m) => [m.id, m.name]));
+  const categoryIds = new Set(
+    cats.filter((c) => !c.isArchived || c.id === allow?.categoryId).map((c) => c.id),
+  );
+  return { accountType, methodAccountType, methodAccountId, methodName, categoryIds };
 }
 
 function futureRejected(date: string): boolean {
@@ -114,6 +130,9 @@ async function buildTxn(
       const methodType = lk.methodAccountType.get(methodId)!;
       const type = deriveSpendType(methodType);
       const categoryId = num("categoryId");
+      if (categoryId != null && !lk.categoryIds.has(categoryId)) {
+        return { ok: false, errors: { categoryId: "Pick an active category" } };
+      }
       return {
         ok: true,
         txn: {
@@ -159,8 +178,11 @@ async function buildTxn(
     case "transfer": {
       const fromAccountId = num("fromAccountId");
       const toAccountId = num("toAccountId");
-      if (fromAccountId == null) return { ok: false, errors: { fromAccountId: "Pick a source" } };
-      if (toAccountId == null) return { ok: false, errors: { toAccountId: "Pick a destination" } };
+      // Unknown ids get a field error here instead of a foreign-key failure on insert.
+      if (fromAccountId == null || !lk.accountType.has(fromAccountId))
+        return { ok: false, errors: { fromAccountId: "Pick a source" } };
+      if (toAccountId == null || !lk.accountType.has(toAccountId))
+        return { ok: false, errors: { toAccountId: "Pick a destination" } };
       if (fromAccountId === toAccountId)
         return { ok: false, errors: { toAccountId: "Must differ from source" } };
       if (lk.accountType.get(fromAccountId) === "credit_card" || lk.accountType.get(toAccountId) === "credit_card")
@@ -185,8 +207,14 @@ async function buildTxn(
       const fromAccountId = num("fromAccountId");
       if (fromAccountId == null || lk.accountType.get(fromAccountId) !== "bank")
         return { ok: false, errors: { fromAccountId: "Pick a bank account" } };
-      // Destination is the single cash account.
-      const cash = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.type, "cash")).limit(1);
+      // Destination is the active cash account — the same one the dashboard's Cash
+      // tile shows (lowest sort order if old data has more than one).
+      const cash = await db
+        .select({ id: accounts.id })
+        .from(accounts)
+        .where(and(eq(accounts.type, "cash"), eq(accounts.isArchived, false)))
+        .orderBy(asc(accounts.sortOrder), asc(accounts.id))
+        .limit(1);
       if (!cash[0]) return { ok: false, errors: { _: "No cash account exists" } };
       return {
         ok: true,
@@ -256,14 +284,25 @@ export async function updateTransaction(_prev: ActionResult, form: FormData): Pr
   const kind = kindFromForm(form);
   if (!kind) return errResult({ _: "Unknown form" });
 
-  const lk = await loadLookups();
+  const [existing] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
+  if (!existing) {
+    const message = "This transaction no longer exists";
+    return errResult({ _: message }, message);
+  }
+  const lk = await loadLookups({
+    accountIds: [existing.fromAccountId, existing.toAccountId].filter((value): value is number => value != null),
+    methodId: existing.methodId,
+    categoryId: existing.categoryId,
+  });
   const built = await buildTxn(kind, form, lk);
   if (!built.ok) return errResult(built.errors);
 
-  await db
+  const updated = await db
     .update(transactions)
     .set({ ...built.txn, updatedAt: new Date() })
-    .where(eq(transactions.id, id));
+    .where(eq(transactions.id, id))
+    .returning({ id: transactions.id });
+  if (updated.length === 0) return errResult({ _: "This transaction no longer exists" });
   revalidatePath("/");
   revalidatePath("/transactions");
   revalidatePath("/add");
@@ -391,6 +430,15 @@ export async function bulkSetCategory(ids: number[], categoryId: number | null):
   await requireAuth();
   const clean = ids.filter((id) => Number.isInteger(id));
   if (clean.length === 0) return errResult({ _: "Nothing selected" });
+  if (categoryId !== null) {
+    const [cat] = Number.isInteger(categoryId)
+      ? await db.select({ id: categories.id }).from(categories).where(eq(categories.id, categoryId)).limit(1)
+      : [];
+    if (!cat) {
+      const message = "That category no longer exists";
+      return errResult({ _: message }, message);
+    }
+  }
 
   // Only expense/cc_spend may carry a category (SPEC §4 rule 3) — skip the rest
   // rather than silently dropping the value.

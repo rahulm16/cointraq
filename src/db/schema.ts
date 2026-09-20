@@ -104,6 +104,13 @@ export const snapshots = pgTable("snapshots", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Single-user lifecycle state that cannot be inferred from mutable ledger rows. */
+export const appState = pgTable("app_state", {
+  id: integer("id").primaryKey(),
+  setupCompleted: boolean("setup_completed").notNull().default(false),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 /**
  * Monthly spending caps. `categoryId = null` is the overall month cap; one row
  * per (category, month). `month` is a "yyyy-MM" key — budgets are a calendar-month

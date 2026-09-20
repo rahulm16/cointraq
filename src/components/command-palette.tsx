@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { DUR, EASE, SPRING } from "@/lib/motion";
 import { cn } from "@/lib/ui";
+import { rememberAddReturnPath } from "@/lib/add-navigation";
 
 /**
  * ⌘K palette. Keyboard-first navigation plus a passthrough to transaction search,
@@ -76,9 +77,11 @@ export function CommandPalette() {
       close();
       // A query with no command match falls through to transaction search.
       if (!cmd) {
-        if (q) router.push(`/transactions?q=${encodeURIComponent(q)}`);
+        // Search every date — the Transactions page otherwise defaults to this month.
+        if (q) router.push(`/transactions?q=${encodeURIComponent(q)}&all=1`);
         return;
       }
+      if (cmd.id === "add" || cmd.id === "spend-add") rememberAddReturnPath();
       cmd.run(router);
     },
     [results, query, router, close],
@@ -107,6 +110,7 @@ export function CommandPalette() {
 
       if (e.key === "n") {
         e.preventDefault();
+        rememberAddReturnPath();
         router.push("/add");
       } else if (e.key === "/") {
         e.preventDefault();

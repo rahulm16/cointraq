@@ -59,11 +59,14 @@ export function effectOnAccount(
 export interface Baseline {
   value: number; // baseline balance value
   date: string | null; // baseline date; null means opening (−∞)
+  /** When the snapshot was saved; null for the opening balance. */
+  createdAt?: Date | null;
 }
 
 /**
  * expected_balance(account, asOf) = baseline + Σ effects of txns with
- * date ∈ (baseline_date, asOf].  SPEC §5.
+ * date ∈ (baseline_date, asOf], plus txns dated ON the baseline date that were
+ * logged after the snapshot was saved.  SPEC §5.
  *
  * `baseline` is the most recent snapshot on/before asOf, else opening_balance
  * with a null (−∞) date. CC accounts have no snapshots, so their baseline is
@@ -78,8 +81,15 @@ export function expectedBalance(
 ): number {
   let total = baseline.value;
   for (const t of txns) {
-    // date strictly after baseline_date, and on/before asOf
-    const afterBaseline = baseline.date == null || dateGt(t.date, baseline.date);
+    // After the baseline: a later date, or the snapshot's own date when logged
+    // after saving — that spend can't be in the actual balance the user entered.
+    const afterBaseline =
+      baseline.date == null ||
+      dateGt(t.date, baseline.date) ||
+      (t.date === baseline.date &&
+        baseline.createdAt != null &&
+        t.createdAt != null &&
+        t.createdAt > baseline.createdAt);
     if (afterBaseline && dateLte(t.date, asOf)) {
       total += effectOnAccount(t, account.id, account.type, methodAccount);
     }

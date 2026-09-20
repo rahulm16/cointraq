@@ -1,6 +1,7 @@
-import type { Account, Category, PaymentMethod, TransactionType } from "./types";
+import type { Account, Category, IncomeSource, PaymentMethod, TransactionType } from "./types";
 import { isValidDateStr } from "./dates";
 import { AMOUNT_MAX, AMOUNT_MIN } from "./constants";
+import { normalizeTxn, ruleLookups } from "./txn-rules";
 
 /**
  * CSV import — the inverse of `buildCsvs`. This is a *manual* import: the user
@@ -8,11 +9,15 @@ import { AMOUNT_MAX, AMOUNT_MIN } from "./constants";
  * nothing syncs.
  *
  * The parser is deliberately forgiving about column order and header casing, but
- * strict about values: every row is validated against the same rules the add form
- * enforces, and a row that fails is reported rather than silently dropped.
+ * strict about values: every row goes through the same transaction rules the Add
+ * form enforces (lib/txn-rules), and a row that fails is reported rather than
+ * silently dropped.
  */
 
 export interface ImportRow {
+  /** Identity from a Cointraq export; null for arbitrary CSV files. */
+  sourceId: number | null;
+  sourceCreatedAt: string | null;
   /** 1-based line number in the source file, for error messages. */
   line: number;
   type: TransactionType;
@@ -23,7 +28,7 @@ export interface ImportRow {
   methodId: number | null;
   fromAccountId: number | null;
   toAccountId: number | null;
-  incomeSource: "salary" | "refund" | "cashback" | "other" | null;
+  incomeSource: IncomeSource | null;
 }
 
 export interface ImportError {
@@ -43,7 +48,7 @@ export interface ParseResult {
 const TYPES: TransactionType[] = ["expense", "cc_spend", "bill_pay", "transfer", "withdrawal", "income"];
 const SOURCES = ["salary", "refund", "cashback", "other"] as const;
 
-/** Split one CSV line, honouring quoted cells and doubled quotes. */
+/** Split one CSV record, honouring quoted cells and doubled quotes. */
 export function splitCsvLine(line: string): string[] {
   const out: string[] = [];
   let cur = "";
@@ -75,12 +80,46 @@ export function splitCsvLine(line: string): string[] {
   return out.map((s) => s.trim());
 }
 
-/** Split a whole file into lines, tolerating CRLF and a trailing newline. */
-function splitLines(text: string): string[] {
-  return text
-    .replace(/^﻿/, "") // strip a BOM from spreadsheet exports
-    .split(/\r?\n/)
-    .filter((l) => l.trim() !== "");
+/**
+ * Split a file into records, tolerating a BOM, CRLF and a trailing newline. A
+ * newline inside a quoted cell belongs to that cell (the export quotes them), so
+ * this walks the text instead of splitting on "\n". Each record keeps the line it
+ * starts on for error messages.
+ */
+export function splitRecords(text: string): { text: string; line: number }[] {
+  const src = text.replace(/^﻿/, "");
+  const out: { text: string; line: number }[] = [];
+  let cur = "";
+  let inQuotes = false;
+  let line = 1;
+  let startLine = 1;
+
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (ch === '"') {
+      // A doubled quote inside a quoted cell is an escaped quote, not a toggle.
+      if (inQuotes && src[i + 1] === '"') {
+        cur += '""';
+        i++;
+        continue;
+      }
+      inQuotes = !inQuotes;
+      cur += ch;
+      continue;
+    }
+    if (!inQuotes && (ch === "\n" || ch === "\r")) {
+      if (ch === "\r" && src[i + 1] === "\n") i++;
+      if (cur.trim() !== "") out.push({ text: cur, line: startLine });
+      cur = "";
+      line++;
+      startLine = line;
+      continue;
+    }
+    if (ch === "\n") line++;
+    cur += ch;
+  }
+  if (cur.trim() !== "") out.push({ text: cur, line: startLine });
+  return out;
 }
 
 /** Rupee amounts may arrive as "₹1,200" or "1200.00" — normalise to whole rupees. */
@@ -105,20 +144,21 @@ export function parseTransactionsCsv(
   ref: { accounts: Account[]; methods: PaymentMethod[]; categories: Category[] },
   today: string,
 ): ParseResult {
-  const lines = splitLines(text);
+  const records = splitRecords(text);
   const errors: ImportError[] = [];
   const rows: ImportRow[] = [];
   const unknownCategories = new Set<string>();
   const unknownMethods = new Set<string>();
   const unknownAccounts = new Set<string>();
 
-  if (lines.length === 0) {
+  if (records.length === 0) {
     return { rows, errors: [{ line: 0, message: "File is empty" }], unknownCategories: [], unknownMethods: [], unknownAccounts: [] };
   }
 
-  const headers = splitCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+  const headers = splitCsvLine(records[0].text).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
   const col = (name: string) => headers.indexOf(name);
 
+  const iId = col("id");
   const iDate = col("date");
   const iType = col("type");
   const iAmount = col("amount");
@@ -128,11 +168,12 @@ export function parseTransactionsCsv(
   const iFrom = col("from_account");
   const iTo = col("to_account");
   const iSource = col("income_source");
+  const iCreatedAt = col("created_at");
 
   if (iDate === -1 || iAmount === -1) {
     return {
       rows,
-      errors: [{ line: 1, message: "Missing required columns: date and amount" }],
+      errors: [{ line: records[0].line, message: "Missing required columns: date and amount" }],
       unknownCategories: [],
       unknownMethods: [],
       unknownAccounts: [],
@@ -142,9 +183,11 @@ export function parseTransactionsCsv(
   const byName = <T extends { name: string; id: number }>(list: T[], name: string): T | undefined =>
     list.find((x) => x.name.toLowerCase() === name.toLowerCase());
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = i + 1;
-    const cells = splitCsvLine(lines[i]);
+  const lookups = ruleLookups(ref.accounts, ref.methods, ref.categories);
+
+  for (let i = 1; i < records.length; i++) {
+    const { line } = records[i];
+    const cells = splitCsvLine(records[i].text);
     const at = (idx: number) => (idx === -1 ? "" : (cells[idx] ?? ""));
 
     const date = at(iDate);
@@ -169,6 +212,14 @@ export function parseTransactionsCsv(
       continue;
     }
     const type = rawType as TransactionType;
+
+    const rawSourceId = Number(at(iId));
+    const sourceId = Number.isInteger(rawSourceId) && rawSourceId > 0 ? rawSourceId : null;
+    const rawCreatedAt = at(iCreatedAt);
+    const parsedCreatedAt = rawCreatedAt ? new Date(rawCreatedAt) : null;
+    const sourceCreatedAt = parsedCreatedAt && !Number.isNaN(parsedCreatedAt.getTime())
+      ? parsedCreatedAt.toISOString()
+      : null;
 
     // Resolve names to ids, collecting anything unrecognised.
     const catName = at(iCategory);
@@ -205,7 +256,7 @@ export function parseTransactionsCsv(
 
     const rawSource = at(iSource).toLowerCase();
     const incomeSource = (SOURCES as readonly string[]).includes(rawSource)
-      ? (rawSource as ImportRow["incomeSource"])
+      ? (rawSource as IncomeSource)
       : null;
 
     // Per-type required fields, mirroring SPEC §4.
@@ -230,18 +281,28 @@ export function parseTransactionsCsv(
       continue;
     }
 
+    // The same rules as the Add form: spend type follows the method, account
+    // types must fit, withdrawals land in cash, categories only on spends.
+    const ruled = normalizeTxn({ type, categoryId, methodId, fromAccountId, toAccountId, incomeSource }, lookups);
+    if (!ruled.ok) {
+      errors.push({ line, message: ruled.message });
+      continue;
+    }
+    const t = ruled.txn;
+
     rows.push({
+      sourceId,
+      sourceCreatedAt,
       line,
-      type,
+      type: t.type,
       amount,
       date,
-      title: at(iTitle) || defaultTitleFor(type),
-      // Categories apply only to spends (SPEC §4 rule 3).
-      categoryId: type === "expense" || type === "cc_spend" ? categoryId : null,
-      methodId,
-      fromAccountId,
-      toAccountId,
-      incomeSource: type === "income" ? (incomeSource ?? "other") : null,
+      title: at(iTitle) || defaultTitleFor(t.type),
+      categoryId: t.categoryId,
+      methodId: t.methodId,
+      fromAccountId: t.fromAccountId,
+      toAccountId: t.toAccountId,
+      incomeSource: t.incomeSource,
     });
   }
 
@@ -252,6 +313,37 @@ export function parseTransactionsCsv(
     unknownMethods: [...unknownMethods],
     unknownAccounts: [...unknownAccounts],
   };
+}
+
+type SourceIdentity = Pick<ImportRow, "sourceId" | "sourceCreatedAt">;
+type ExistingIdentity = { id: number; createdAt: Date };
+
+function exportIdentity(id: number, createdAt: Date | string): string {
+  const instant = createdAt instanceof Date ? createdAt.toISOString() : createdAt;
+  return `${id}|${instant}`;
+}
+
+/**
+ * Drop only rows carrying the exact id + created_at identity from this ledger's
+ * export. Arbitrary CSV rows have no stable identity, so even identical-looking
+ * transactions are retained rather than risking silent data loss.
+ */
+export function dropExisting<T extends SourceIdentity>(rows: T[], existing: ExistingIdentity[]): { rows: T[]; duplicates: number } {
+  const identities = new Set(existing.map((e) => exportIdentity(e.id, e.createdAt)));
+  const kept: T[] = [];
+  let duplicates = 0;
+  for (const r of rows) {
+    const duplicate =
+      r.sourceId != null &&
+      r.sourceCreatedAt != null &&
+      identities.has(exportIdentity(r.sourceId, r.sourceCreatedAt));
+    if (duplicate) {
+      duplicates++;
+    } else {
+      kept.push(r);
+    }
+  }
+  return { rows: kept, duplicates };
 }
 
 function defaultTitleFor(type: TransactionType): string {

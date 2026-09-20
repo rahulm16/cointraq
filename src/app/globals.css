@@ -239,8 +239,14 @@ html[data-sidebar-pinned] .rail .rail-when-expanded {
   display: none;
 }
 
-/* No focus chrome — caret / selection state is enough. */
+:focus,
 :focus-visible {
+  outline: none;
+}
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
   outline: none;
 }
 

@@ -40,7 +40,10 @@ export default async function BudgetsPage({
   const hasPrevious = allBudgets.some((b) => b.month === prevMonth);
 
   return (
+    // Keyed by month: the inline cap inputs hold drafts in local state, and a query
+    // change alone doesn't remount the page — without the key they'd keep last month's numbers.
     <BudgetsClient
+      key={month}
       month={month}
       prevMonth={prevMonth}
       nowMonth={monthKey(today)}
