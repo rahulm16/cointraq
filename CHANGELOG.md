@@ -4,6 +4,18 @@ Notable changes are recorded here for each tagged release.
 
 ## Unreleased
 
+### Security
+
+- Upgraded Next.js and `eslint-config-next` to 16.3.5, fixing the critical
+  Next.js advisories (proxy bypass in App Router with Turbopack, Server Actions
+  denial of service, SSRF on custom servers, response cache confusion).
+- Applied `npm audit fix` for the high severity transitive advisories
+  (brace-expansion, browserslist, js-yaml, nanoid, postcss, sharp, undici).
+- `npm audit` on 2026-09-21 reports 4 moderate advisories, all from the esbuild
+  copy bundled with `drizzle-kit`, a development-only CLI that is not part of
+  the deployed app. The only suggested fix is a breaking downgrade of
+  `drizzle-kit`, so it is left as is.
+
 ## 0.1.0 — 2026-09-20
 
 Initial tagged release of cointraq, a self-hosted personal expense tracker for
